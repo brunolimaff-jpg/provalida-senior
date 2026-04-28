@@ -2,8 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import PDFUploader from './PDFUploader';
-import { DEMO_PDF_TEXT, DEMO_EXTRACTION } from './constants';
-import type { ExtractionResult } from './types';
+import { DEMO_PDF_TEXT } from './constants';
 
 interface UploadViewProps {
   pdfFileName: string;
