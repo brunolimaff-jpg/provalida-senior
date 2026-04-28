@@ -246,7 +246,7 @@ function InvestmentSection({ investimentos, impostoCCI, impostosInclusos }: { in
       <div className="px-5 py-2.5 border-b border-[var(--border)] bg-[#cedcd8]/20">
         <p className="text-[10px] text-[var(--text)]">
           {impostosInclusos
-            ? `Valores JÁ INCLUEM ${impostoCCI}% de imposto CCI. O valor "sem imposto" é o base, calculado dividindo por ${(1 + impostoCCI / 100).toFixed(3)}. A diferença entre "com imposto" e "sem imposto" deve ser de ~${impostoCCI}%.`
+            ? `Valores JÁ INCLUEM ${impostoCCI}% de imposto CCI. O valor "sem imposto" é o BASE (mais confiável), e o valor "com imposto" = sem imposto × ${(1 + impostoCCI / 100).toFixed(3)}. A diferença entre eles deve ser de ~${impostoCCI}%.`
             : `Valores NÃO INCLUEM ${impostoCCI}% de imposto CCI. O valor "com imposto" = sem imposto × ${(1 + impostoCCI / 100).toFixed(3)}. A diferença deve ser de ~${impostoCCI}%.`
           }
         </p>

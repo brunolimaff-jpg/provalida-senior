@@ -35,7 +35,7 @@ IMPORTANTE:
 - Extraia os dados na mesma estrutura de seções da proposta (1.1 MÓDULOS, 2. ESCOPO, 3. INVESTIMENTO, 5. CONDIÇÕES DE PAGAMENTO).
 - Para MÓDULOS: identifique cada BLOCO (ex: "Gestão de Pessoas | HCM", "Gestão Empresarial | ERP") e dentro de cada bloco, liste os módulos com suas quantidades e unidades/modalidades.
 - Para ESCOPO: extraia os IDs completos (ex: "ESCOPO_SINTETICO_372008_PM_ERP_JEQUITIBA_04082025").
-- Para INVESTIMENTO: extraia os valores COM impostos e calcule os valores SEM impostos (dividindo por 1.105 quando "Impostos já inclusos"). Confirme se o imposto CCI é de 10,50%.
+- Para INVESTIMENTO: extraia os valores do documento. Os valores no documento geralmente INCLUEM impostos (10,50% CCI). O valor "sem imposto" é o BASE (mais confiável, vem automaticamente do sistema). O valor "com imposto" = sem imposto × 1.105. Valide se a diferença entre "com imposto" e "sem imposto" é de aproximadamente 10,50%. Se os valores do documento já incluem imposto, calcule o "sem imposto" dividindo por 1.105. Confirme se o imposto CCI é de 10,50%.
 - Para CONDIÇÕES DE PAGAMENTO: organize por tipo (Mensalidade, Habilitação + Serviços), incluindo condições de desconto de carência, desconto de habilitação e desconto de serviços.
 - Alguns campos podem NÃO estar na proposta (Revisão, Tipo Alíquota, Motivo da Reprogramação, Responsável pelo Suporte, Layout, Cobrança de Despesas, Possui Rateio). Para esses, deixe vazio em camposAusentes.
 - Se o imposto for 10,50% e estiver incluso nos valores, confirme em impostosInclusos=true.

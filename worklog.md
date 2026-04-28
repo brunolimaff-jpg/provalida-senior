@@ -82,3 +82,36 @@ Stage Summary:
 - Cross-validation catches LLM errors (e.g., R$ 15.234,80 → corrected to R$ 15.240,80)
 - Payment conditions properly extracted from PDF
 - All builds passing
+
+---
+Task ID: 4
+Agent: Main Agent
+Task: Fix PDF value extraction for Investment (section 3) and Payment Conditions (section 5), invert tax calculation
+
+Work Log:
+- Investigated root cause: PDF.js joins all text items with spaces, destroying line structure
+- Rewrote PDFUploader.tsx: text extraction now groups items by Y-position (same visual line) and sorts by X-position, preserving original document structure
+- Created extrairInvestimentoDoPDF() with 4 extraction strategies:
+  1. Direct regex with 6+ patterns per keyword (Mensalidade, Habilitação)
+  2. Keyword+value line matching via extrairValoresMonetarios()
+  3. Context window search (keyword line + next 2 lines)
+  4. Largest values inference (smallest = Mensalidade, largest = Habilitação)
+- Created extrairCondicoesDoPDF() with section-based extraction:
+  - Identifies section boundaries (between "5. CONDIÇÕES" and next section)
+  - Separates mensalidade and habilitação subsections
+  - Extracts desconto de habilitação/serviços, prazo, validade, multa, faturamento, financiamento
+- Created extrairValoresMonetarios() helper: finds ALL R$ values in text, supports various formats
+- Inverted tax calculation: "sem imposto" is always the BASE, "com imposto" = sem_imposto × 1.105
+- Updated validarERecalcularInvestimentos(): always uses sem_imposto as base, validates 10.50% difference
+- Updated API prompt (route.ts): instructs LLM that sem_imposto is base, com_imposto = sem × 1.105
+- Updated ResultsView info text to clarify correct tax logic
+- Added console.log debugging for PDF extraction troubleshooting
+- Project builds successfully with no errors
+
+Stage Summary:
+- PDF text extraction now preserves original line structure (Y-position grouping)
+- Investment values extraction uses 4 fallback strategies for maximum compatibility with real PDFs
+- Payment conditions extracted by section-based parsing with mensalidade/habilitação separation
+- Tax calculation corrected: sem_imposto is BASE, com_imposto = sem_imposto × 1.105
+- Added extensive logging for debugging extraction issues
+- All builds passing successfully

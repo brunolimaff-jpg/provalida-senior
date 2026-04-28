@@ -27,6 +27,7 @@ export default function PDFUploader({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Extrair texto do PDF usando pdfjs-dist
+  // Agrupa itens por posição Y para reconstruir as linhas originais
   const extractTextFromPDF = useCallback(async (file: File) => {
     try {
       const arrayBuffer = await file.arrayBuffer();
@@ -40,13 +41,60 @@ export default function PDFUploader({
       for (let i = 1; i <= numPages; i++) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
-        const pageText = textContent.items
-          .map((item: { str?: string }) => item.str || '')
-          .join(' ');
-        fullText += pageText + '\n';
+
+        // Agrupar itens por posição Y (mesma linha visual)
+        // Isso preserva a estrutura de linhas do documento original
+        interface TextItem {
+          str: string;
+          x: number;
+          y: number;
+          width: number;
+        }
+        const lineMap = new Map<string, TextItem[]>();
+        const Y_TOLERANCE = 3; // tolerância de 3px para considerar mesma linha
+
+        for (const item of textContent.items) {
+          const tItem = item as { str?: string; transform?: number[]; width?: number };
+          if (!tItem.str || tItem.str.trim() === '' || !tItem.transform) continue;
+
+          const x = tItem.transform[4];
+          const y = Math.round(tItem.transform[5]); // arredondar Y para agrupar
+          const w = tItem.width || 0;
+
+          // Encontrar linha existente dentro da tolerância
+          let matchedKey: string | null = null;
+          for (const key of lineMap.keys()) {
+            const existingY = parseInt(key);
+            if (Math.abs(y - existingY) <= Y_TOLERANCE) {
+              matchedKey = key;
+              break;
+            }
+          }
+
+          const entry: TextItem = { str: tItem.str, x, y, width: w };
+          if (matchedKey) {
+            lineMap.get(matchedKey)!.push(entry);
+          } else {
+            lineMap.set(String(y), [entry]);
+          }
+        }
+
+        // Ordenar linhas de cima para baixo (Y decrescente em PDF)
+        const sortedLines = [...lineMap.entries()]
+          .sort(([a], [b]) => parseInt(b) - parseInt(a));
+
+        for (const [, items] of sortedLines) {
+          // Ordenar itens da esquerda para a direita
+          items.sort((a, b) => a.x - b.x);
+          const lineText = items.map(i => i.str).join(' ');
+          fullText += lineText + '\n';
+        }
+
+        fullText += '\n'; // separar páginas
       }
 
       const hasText = fullText.trim().length > 10;
+      console.log('[ProValida] Texto extraído do PDF (primeiros 2000 chars):', fullText.substring(0, 2000));
       onFileLoaded(file.name, file.size, fullText, hasText);
 
       if (hasText) {
