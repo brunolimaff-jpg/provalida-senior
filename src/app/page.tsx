@@ -94,7 +94,7 @@ export default function ProValidaApp() {
 
         if (extractRes.ok) {
           extractionResult = await extractRes.json();
-          // Garantir campos obrigatórios
+          // Garantir campos obrigatórios e normalizar dados da API
           extractionResult.textoBruto = extractionResult.textoBruto || pdfText;
           extractionResult.modulos = extractionResult.modulos || [];
           extractionResult.escopos = extractionResult.escopos || [];
@@ -106,18 +106,20 @@ export default function ProValidaApp() {
           extractionResult.rateio = extractionResult.rateio || [];
           extractionResult.campos = extractionResult.campos || [];
 
-          // Recalcular valores de investimento (a IA pode errar na formatação)
-          extractionResult.investimentos = recalcularInvestimentos(
-            extractionResult.investimentos || [],
-            extractionResult.impostoCCI || 10.50,
-            extractionResult.impostosInclusos ?? true
-          );
+          // Complementar dados faltantes com extração local do texto
+          extractionResult = complementarComExtracaoLocal(extractionResult, pdfText);
 
-          // Corrigir campo "Impostos" se o texto bruto contém a informação
-          if (!extractionResult.camposAusentes.impostos && pdfText.toLowerCase().includes('impostos')) {
-            const lower = pdfText.toLowerCase();
-            if (lower.includes('impostos já inclusos') || lower.includes('contêm impostos') || lower.includes('incluem impostos')) {
-              extractionResult.camposAusentes.impostos = 'Impostos já inclusos';
+          // Recalcular valores de investimento (a IA pode errar na formatação)
+          if (extractionResult.investimentos && extractionResult.investimentos.length > 0) {
+            const temValores = extractionResult.investimentos.some(
+              i => i.valorComImposto && i.valorComImposto !== '—' && i.valorComImposto !== '' && i.valorComImposto !== 'R$ 0,00'
+            );
+            if (temValores) {
+              extractionResult.investimentos = recalcularInvestimentos(
+                extractionResult.investimentos,
+                extractionResult.impostoCCI || 10.50,
+                extractionResult.impostosInclusos ?? true
+              );
             }
           }
         } else {
@@ -293,6 +295,166 @@ export default function ProValidaApp() {
       <ToastContainer />
     </div>
   );
+}
+
+// ============================================================
+// Complementar dados da API com extração local do texto do PDF
+// ============================================================
+function complementarComExtracaoLocal(result: ExtractionResult, pdfText: string): ExtractionResult {
+  const lower = pdfText.toLowerCase();
+  const findPattern = (patterns: RegExp[]): string | null => {
+    for (const p of patterns) {
+      const match = pdfText.match(p);
+      if (match) return match[1] || match[0];
+    }
+    return null;
+  };
+
+  const parseBRL = (s: string): number | null => {
+    const clean = s.replace(/[R$\s]/g, '').replace(/\./g, '').replace(',', '.');
+    const n = parseFloat(clean);
+    return isNaN(n) ? null : n;
+  };
+
+  const formatBRL = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  // Complementar informações gerais
+  if (!result.cliente || result.cliente === 'Não identificado') {
+    result.cliente = findPattern([/Cliente:\s*(.+?)(?:\s*—|\s*CNPJ)/i]) || result.cliente || '';
+  }
+  if (!result.cnpj) {
+    result.cnpj = findPattern([/CNPJ[:\s]*([\d./-]+)/i]) || '';
+  }
+  if (!result.endereco) {
+    result.endereco = findPattern([/Endereço:\s*(.+?)(?:\s*—|\s*CEP)/i]) || '';
+  }
+  if (!result.executivo) {
+    result.executivo = findPattern([/Executivo[^:]*:\s*(.+?)(?:\s*—|\s*$)/im]) || '';
+  }
+  if (!result.emailExecutivo) {
+    result.emailExecutivo = findPattern([/[\w.]+@senior\.com\.br/i]) || '';
+  }
+  if (!result.codigoProposta) {
+    result.codigoProposta = findPattern([/PR[\w]+/i]) || '';
+  }
+
+  // Complementar investimentos — se estiverem vazios ou com "—"
+  const investimentosTemValores = result.investimentos && result.investimentos.length > 0 &&
+    result.investimentos.some(i => i.valorComImposto && i.valorComImposto !== '—' && i.valorComImposto !== '' && i.valorComImposto !== 'R$ 0,00');
+
+  if (!investimentosTemValores) {
+    const mensalidadeComImposto = findPattern([/Mensalidade[^:]*:\s*R\$\s*([\d.,]+)/i]);
+    const habilitacaoComImposto = findPattern([/Habilitação[^:]*:\s*R\$\s*([\d.,]+)/i]);
+
+    const mensalidadeNum = mensalidadeComImposto ? parseBRL(mensalidadeComImposto) : null;
+    const habilitacaoNum = habilitacaoComImposto ? parseBRL(habilitacaoComImposto) : null;
+    const cci = result.impostoCCI || 10.50;
+
+    result.investimentos = [
+      {
+        descricao: 'Mensalidade',
+        valorComImposto: mensalidadeNum ? formatBRL(mensalidadeNum) : '—',
+        valorSemImposto: mensalidadeNum ? formatBRL(mensalidadeNum / (1 + cci / 100)) : '—',
+      },
+      {
+        descricao: 'Habilitação + Serviços',
+        valorComImposto: habilitacaoNum ? formatBRL(habilitacaoNum) : '—',
+        valorSemImposto: habilitacaoNum ? formatBRL(habilitacaoNum / (1 + cci / 100)) : '—',
+      },
+    ];
+  } else {
+    // Recalcular os sem imposto para garantir precisão
+    result.investimentos = result.investimentos.map(inv => {
+      const valorCom = parseBRL(inv.valorComImposto);
+      if (valorCom) {
+        const cci = result.impostoCCI || 10.50;
+        return {
+          ...inv,
+          valorComImposto: formatBRL(valorCom),
+          valorSemImposto: formatBRL(valorCom / (1 + cci / 100)),
+        };
+      }
+      return inv;
+    });
+  }
+
+  // Complementar condições de pagamento — se estiverem vazias
+  const condicoesTemValores = result.condicoes && result.condicoes.length > 0 &&
+    result.condicoes.some(c => c.condicao && c.condicao.trim() !== '');
+
+  if (!condicoesTemValores) {
+    const carencia = findPattern([/(\d+)\s*primeiras?\s*parcelas/i]);
+    const descontoCarencia = findPattern([/(\d+)%\s*de\s*desconto/i]);
+    const valorCarencia = findPattern([/desconto\s*[—-]\s*R\$\s*([\d.,]+)/i]);
+
+    result.condicoes = [
+      {
+        tipo: 'Mensalidade',
+        condicao: carencia ? `${carencia} primeiras parcelas com ${descontoCarencia}% de desconto${valorCarencia ? ' — R$ ' + valorCarencia : ''}` : '',
+        descontoHabilitacao: 'Não informado',
+        descontoServicos: 'Não informado',
+      },
+      {
+        tipo: 'Habilitação + Serviços',
+        condicao: lower.includes('btg') ? 'Pagamento à vista ou financiado via BTG Pactual.' : '',
+        descontoHabilitacao: 'Não informado',
+        descontoServicos: 'Não informado',
+      },
+    ];
+  }
+
+  // Complementar escopos se vazio
+  if (!result.escopos || result.escopos.length === 0) {
+    const escopoPattern = /ESCOPO_SINTETICO[\w_[\]]+/gi;
+    const escopoMatches = [...pdfText.matchAll(escopoPattern)];
+    if (escopoMatches.length > 0) {
+      result.escopos = escopoMatches.map(m => ({ id: m[0] }));
+    }
+  }
+
+  // Complementar prazo, validade, multa
+  if (!result.prazoContratual) {
+    result.prazoContratual = findPattern([/(\d+)\s*meses/i]) || '';
+  }
+  if (!result.validadeProposta) {
+    result.validadeProposta = findPattern([/Validade:\s*(\d+\s*dias)/i]) || '';
+  }
+  if (!result.multaRescisoria) {
+    result.multaRescisoria = findPattern([/Multa rescisória:\s*(.+)/i]) || '';
+  }
+  if (!result.faturamentoServicos) {
+    result.faturamentoServicos = lower.includes('antecipado') ? 'Antecipado' : lower.includes('pós-entrega') ? 'Pós-entrega' : '';
+  }
+  if (!result.financiamento) {
+    if (lower.includes('btg')) {
+      result.financiamento = 'Financiamento Banco BTG Pactual — Prazo: 15 dias — Cancelamento automático';
+    }
+  }
+
+  // Corrigir campo "Impostos" nos campos ausentes
+  if (!result.camposAusentes.impostos) {
+    if (lower.includes('impostos já inclusos') || lower.includes('contêm impostos') || lower.includes('incluem impostos')) {
+      result.camposAusentes.impostos = 'Impostos já inclusos';
+    }
+  }
+
+  // Detectar impostoCCI se não foi detectado
+  if (!result.impostoCCI || result.impostoCCI === 0) {
+    const impostoMatch = findPattern([/([\d,]+)\s*%\s*.*(?:CCI|imposto)/i]) ||
+                         findPattern([/(?:CCI|imposto).*?([\d,]+)\s*%/i]);
+    if (impostoMatch) {
+      result.impostoCCI = parseFloat(impostoMatch.replace(',', '.'));
+    } else {
+      result.impostoCCI = 10.50;
+    }
+  }
+
+  // Detectar impostosInclusos
+  if (result.impostosInclusos === undefined || result.impostosInclusos === null) {
+    result.impostosInclusos = lower.includes('impostos') && (lower.includes('inclusos') || lower.includes('contêm') || lower.includes('incluem'));
+  }
+
+  return result;
 }
 
 // ============================================================
