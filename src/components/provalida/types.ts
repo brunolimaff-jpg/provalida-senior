@@ -1,6 +1,35 @@
+'use client';
+
+import type { CRMData, ValidationItem, ValidationResult } from './types';
+
+// Tipo para campos extraídos
+export interface ExtractedField {
+  campo: string;
+  valor: string;
+  encontrado: boolean;
+  origem: 'pdf' | 'inferido' | 'nao_encontrado';
+  trechoPDF?: string;
+}
+
+export interface ExtractedRateio {
+  conta: string;
+  tipoRateio: string;
+  percentual: string;
+}
+
+export interface ExtractionResult {
+  campos: ExtractedField[];
+  rateio: ExtractedRateio[];
+  observacaoRateio: string;
+  valoresComImposto: { label: string; valor: string }[];
+  valoresSemImposto: { label: string; valor: string }[];
+  impostoCCI: number;
+  textoBruto: string;
+}
+
 export type CurrentView = 'upload' | 'processing' | 'results';
 export type ValidationStatus = 'ok' | 'warning' | 'error' | 'info';
-export type ValidationCategory = 'CRM Interno' | 'CRM × PDF' | 'Qualidade';
+export type ValidationCategory = 'CRM Interno' | 'CRM × PDF' | 'Qualidade' | 'Campo Exclusivo CRM';
 export type ThemeMode = 'light' | 'dark';
 
 export interface ContaRateio {
@@ -47,6 +76,7 @@ export interface ValidationResult {
   score: number;
   classificacao: string;
   resumo: string;
+  camposCRMNaoEncontrados?: string[];
   itens: ValidationItem[];
 }
 
@@ -54,19 +84,4 @@ export interface Toast {
   id: string;
   type: 'success' | 'error' | 'warning' | 'info';
   message: string;
-}
-
-export interface AppState {
-  currentView: CurrentView;
-  crmData: CRMData;
-  pdfText: string;
-  pdfFileName: string;
-  pdfFileSize: number;
-  pdfHasText: boolean;
-  validationResult: ValidationResult | null;
-  toasts: Toast[];
-  theme: ThemeMode;
-  correctedText: string;
-  activeFilter: string;
-  activeDocTab: 'original' | 'corrected';
 }

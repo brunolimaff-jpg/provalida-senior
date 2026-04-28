@@ -3,29 +3,26 @@
 ---
 Task ID: 1
 Agent: Main Agent
-Task: Build complete ProValida Senior application
+Task: Redesign ProValida Senior to PDF-first approach (no manual form)
 
 Work Log:
-- Initialized Next.js 16 project with fullstack-dev skill
-- Created 20+ component files in src/components/provalida/
-- Implemented complete CRM form with all 17+ fields
-- Built RateioTable with dynamic rows and real-time sum validation
-- Created PDFUploader with drag&drop and pdfjs-dist text extraction
-- Implemented ProcessingView with animated steps and progress bar
-- Built ResultsView with two-column layout (55%/45%)
-- Created ScoreCard, FilterChips, ValidationList, ValidationItem components
-- Implemented DocumentPanel with Original/Corrected tabs
-- Built ExportPanel with PDF and CSV export functionality
-- Integrated Gemini API with full 17-rule fallback validation
-- Implemented dark mode with localStorage persistence
-- Added toast notifications via sonner
-- Fixed duplicate theme state declaration bug in page.tsx
-- Verified all components render correctly
+- Analyzed user's screenshot showing CRM fields via VLM (z-ai vision)
+- Identified key fields from Jequitibá Agro proposal
+- Removed manual CRM form — replaced with PDF upload-only interface
+- Created /api/extract route using z-ai-web-dev-sdk for AI field extraction
+- Created /api/validate route using z-ai-web-dev-sdk for AI validation
+- Created ExtractedFieldsPanel showing fields with 3 statuses: PDF found / Inferred / Not found
+- Created TaxCalculationPanel with CCI 10.50% calculations (with/without tax)
+- Updated page.tsx with new flow: Upload → Extract → Validate → Results
+- Added local fallback extraction (regex-based) when API is unavailable
+- Added local fallback validation when API is unavailable
+- Updated gemini.ts to work with extracted fields instead of CRMData
+- Key insight: Fields like Revisão, Tipo Alíquota, Imposto CCI, Motivo da Reprogramação, Responsável pelo Suporte, Layout, Cobrança de Despesas are NOT in the PDF proposal — they're CRM-only fields
+- Added "Campo Exclusivo CRM" validation category for these fields
 
 Stage Summary:
-- Complete ProValida Senior application built and running
-- All 3 screens (Upload, Processing, Results) fully functional
-- 17 validation rules implemented as fallback when Gemini API is unavailable
-- PDF export (jsPDF) and CSV export with BOM prefix working
-- Dark mode, responsive design, custom color scheme all implemented
-- App compiles and renders at localhost:3000
+- App now has PDF-first flow: user only uploads proposal
+- AI extracts all fields automatically via backend API
+- Fields that don't exist in PDF are flagged for manual CRM verification
+- Tax calculations show values with and without 10.50% CCI
+- App compiles and renders successfully

@@ -4,10 +4,12 @@ import { useState, useEffect, useMemo } from 'react';
 import { Check, Loader2 } from 'lucide-react';
 import { PROCESSING_STEPS } from './constants';
 
-export default function ProcessingView() {
-  const [currentStep, setCurrentStep] = useState(0);
+interface ProcessingViewProps {
+  currentStepOverride?: string;
+}
 
-  // Calcular progresso derivado do passo atual (sem setState)
+export default function ProcessingView({ currentStepOverride }: ProcessingViewProps) {
+  const [currentStep, setCurrentStep] = useState(0);
   const progress = useMemo(() => (currentStep / PROCESSING_STEPS.length) * 100, [currentStep]);
 
   useEffect(() => {
@@ -40,7 +42,7 @@ export default function ProcessingView() {
         {/* Título */}
         <div className="text-center">
           <h2 className="text-lg font-semibold text-[var(--text)]">Analisando proposta...</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">Aguarde enquanto validamos os dados</p>
+          <p className="mt-1 text-sm text-[var(--muted)]">Extraindo campos e validando regras</p>
         </div>
 
         {/* Barra de progresso */}
