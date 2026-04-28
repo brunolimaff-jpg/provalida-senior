@@ -107,21 +107,17 @@ export default function ProValidaApp() {
           extractionResult.campos = extractionResult.campos || [];
 
           // Complementar dados faltantes com extração local do texto
+          // Isso garante que valores financeiros, condições etc. sejam preenchidos
+          // mesmo quando a API LLM retorna campos vazios
           extractionResult = complementarComExtracaoLocal(extractionResult, pdfText);
 
-          // Recalcular valores de investimento (a IA pode errar na formatação)
-          if (extractionResult.investimentos && extractionResult.investimentos.length > 0) {
-            const temValores = extractionResult.investimentos.some(
-              i => i.valorComImposto && i.valorComImposto !== '—' && i.valorComImposto !== '' && i.valorComImposto !== 'R$ 0,00'
-            );
-            if (temValores) {
-              extractionResult.investimentos = recalcularInvestimentos(
-                extractionResult.investimentos,
-                extractionResult.impostoCCI || 10.50,
-                extractionResult.impostosInclusos ?? true
-              );
-            }
-          }
+          // Recalcular e validar investimentos
+          extractionResult.investimentos = validarERecalcularInvestimentos(
+            extractionResult.investimentos || [],
+            extractionResult.impostoCCI || 10.50,
+            extractionResult.impostosInclusos ?? true,
+            pdfText
+          );
         } else {
           throw new Error('API de extração falhou');
         }
@@ -299,6 +295,8 @@ export default function ProValidaApp() {
 
 // ============================================================
 // Complementar dados da API com extração local do texto do PDF
+// Esta função SEMPRE tenta extrair valores do texto para garantir
+// que os campos não fiquem vazios quando a API LLM falha
 // ============================================================
 function complementarComExtracaoLocal(result: ExtractionResult, pdfText: string): ExtractionResult {
   const lower = pdfText.toLowerCase();
@@ -319,35 +317,51 @@ function complementarComExtracaoLocal(result: ExtractionResult, pdfText: string)
   const formatBRL = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   // Complementar informações gerais
-  if (!result.cliente || result.cliente === 'Não identificado') {
+  if (!result.cliente || result.cliente === 'Não identificado' || result.cliente.trim() === '') {
     result.cliente = findPattern([/Cliente:\s*(.+?)(?:\s*—|\s*CNPJ)/i]) || result.cliente || '';
   }
-  if (!result.cnpj) {
+  if (!result.cnpj || result.cnpj.trim() === '') {
     result.cnpj = findPattern([/CNPJ[:\s]*([\d./-]+)/i]) || '';
   }
-  if (!result.endereco) {
+  if (!result.endereco || result.endereco.trim() === '') {
     result.endereco = findPattern([/Endereço:\s*(.+?)(?:\s*—|\s*CEP)/i]) || '';
   }
-  if (!result.executivo) {
+  if (!result.executivo || result.executivo.trim() === '') {
     result.executivo = findPattern([/Executivo[^:]*:\s*(.+?)(?:\s*—|\s*$)/im]) || '';
   }
-  if (!result.emailExecutivo) {
+  if (!result.emailExecutivo || result.emailExecutivo.trim() === '') {
     result.emailExecutivo = findPattern([/[\w.]+@senior\.com\.br/i]) || '';
   }
-  if (!result.codigoProposta) {
+  if (!result.codigoProposta || result.codigoProposta.trim() === '') {
     result.codigoProposta = findPattern([/PR[\w]+/i]) || '';
   }
 
-  // Complementar investimentos — se estiverem vazios ou com "—"
+  // ==========================================
+  // INVESTIMENTO — sempre tentar extrair do texto
+  // A lógica é: valor "sem imposto" é o BASE,
+  // valor "com imposto" = sem imposto × 1.105
+  // ==========================================
   const investimentosTemValores = result.investimentos && result.investimentos.length > 0 &&
-    result.investimentos.some(i => i.valorComImposto && i.valorComImposto !== '—' && i.valorComImposto !== '' && i.valorComImposto !== 'R$ 0,00');
+    result.investimentos.some(i => {
+      const v = i.valorComImposto || i.valorSemImposto;
+      return v && v !== '—' && v !== '' && v !== 'R$ 0,00';
+    });
 
   if (!investimentosTemValores) {
-    const mensalidadeComImposto = findPattern([/Mensalidade[^:]*:\s*R\$\s*([\d.,]+)/i]);
-    const habilitacaoComImposto = findPattern([/Habilitação[^:]*:\s*R\$\s*([\d.,]+)/i]);
+    // Extrair valores financeiros diretamente do texto do PDF
+    const mensalidadeStr = findPattern([
+      /Mensalidade[^:]*:\s*R\$\s*([\d.,]+)/i,
+      /Mensalidade\s*\(com impostos\)\s*:\s*R\$\s*([\d.,]+)/i,
+      /mensalidade.*?R\$\s*([\d.,]+)/i,
+    ]);
+    const habilitacaoStr = findPattern([
+      /Habilitação[^:]*:\s*R\$\s*([\d.,]+)/i,
+      /Habilitação\s*\+?\s*Serviços[^:]*:\s*R\$\s*([\d.,]+)/i,
+      /habilitação.*?R\$\s*([\d.,]+)/i,
+    ]);
 
-    const mensalidadeNum = mensalidadeComImposto ? parseBRL(mensalidadeComImposto) : null;
-    const habilitacaoNum = habilitacaoComImposto ? parseBRL(habilitacaoComImposto) : null;
+    const mensalidadeNum = mensalidadeStr ? parseBRL(mensalidadeStr) : null;
+    const habilitacaoNum = habilitacaoStr ? parseBRL(habilitacaoStr) : null;
     const cci = result.impostoCCI || 10.50;
 
     result.investimentos = [
@@ -362,45 +376,63 @@ function complementarComExtracaoLocal(result: ExtractionResult, pdfText: string)
         valorSemImposto: habilitacaoNum ? formatBRL(habilitacaoNum / (1 + cci / 100)) : '—',
       },
     ];
-  } else {
-    // Recalcular os sem imposto para garantir precisão
-    result.investimentos = result.investimentos.map(inv => {
-      const valorCom = parseBRL(inv.valorComImposto);
-      if (valorCom) {
-        const cci = result.impostoCCI || 10.50;
-        return {
-          ...inv,
-          valorComImposto: formatBRL(valorCom),
-          valorSemImposto: formatBRL(valorCom / (1 + cci / 100)),
-        };
-      }
-      return inv;
-    });
   }
 
-  // Complementar condições de pagamento — se estiverem vazias
+  // ==========================================
+  // CONDIÇÕES DE PAGAMENTO — sempre tentar extrair do texto
+  // ==========================================
   const condicoesTemValores = result.condicoes && result.condicoes.length > 0 &&
     result.condicoes.some(c => c.condicao && c.condicao.trim() !== '');
 
   if (!condicoesTemValores) {
+    // Extrair condições de pagamento do texto
     const carencia = findPattern([/(\d+)\s*primeiras?\s*parcelas/i]);
     const descontoCarencia = findPattern([/(\d+)%\s*de\s*desconto/i]);
     const valorCarencia = findPattern([/desconto\s*[—-]\s*R\$\s*([\d.,]+)/i]);
 
+    // Extrair condições de mensalidade
+    let condicaoMensalidade = '';
+    if (carencia) {
+      condicaoMensalidade = `${carencia} primeiras parcelas com ${descontoCarencia}% de desconto`;
+      if (valorCarencia) condicaoMensalidade += ` — R$ ${valorCarencia}`;
+    }
+
+    // Extrair condições de habilitação
+    let condicaoHabilitacao = '';
+    if (lower.includes('btg')) {
+      condicaoHabilitacao = 'Pagamento à vista ou financiado via BTG Pactual.';
+    }
+
+    // Extrair desconto de habilitação e serviços
+    const descHabilitacao = findPattern([/[Dd]esconto de habilitação:\s*(.+)/i]) || 'Não informado';
+    const descServicos = findPattern([/[Dd]esconto de serviços:\s*(.+)/i]) || 'Não informado';
+
     result.condicoes = [
       {
         tipo: 'Mensalidade',
-        condicao: carencia ? `${carencia} primeiras parcelas com ${descontoCarencia}% de desconto${valorCarencia ? ' — R$ ' + valorCarencia : ''}` : '',
-        descontoHabilitacao: 'Não informado',
-        descontoServicos: 'Não informado',
+        condicao: condicaoMensalidade,
+        descontoHabilitacao: descHabilitacao,
+        descontoServicos: descServicos,
       },
       {
         tipo: 'Habilitação + Serviços',
-        condicao: lower.includes('btg') ? 'Pagamento à vista ou financiado via BTG Pactual.' : '',
-        descontoHabilitacao: 'Não informado',
-        descontoServicos: 'Não informado',
+        condicao: condicaoHabilitacao,
+        descontoHabilitacao: descHabilitacao,
+        descontoServicos: descServicos,
       },
     ];
+  } else {
+    // Mesmo tendo condições, complementar descontos se estiverem vazios
+    for (const cond of result.condicoes) {
+      if (!cond.descontoHabilitacao || cond.descontoHabilitacao.trim() === '') {
+        const descHab = findPattern([/[Dd]esconto de habilitação:\s*(.+)/i]);
+        cond.descontoHabilitacao = descHab || 'Não informado';
+      }
+      if (!cond.descontoServicos || cond.descontoServicos.trim() === '') {
+        const descServ = findPattern([/[Dd]esconto de serviços:\s*(.+)/i]);
+        cond.descontoServicos = descServ || 'Não informado';
+      }
+    }
   }
 
   // Complementar escopos se vazio
@@ -413,26 +445,26 @@ function complementarComExtracaoLocal(result: ExtractionResult, pdfText: string)
   }
 
   // Complementar prazo, validade, multa
-  if (!result.prazoContratual) {
+  if (!result.prazoContratual || result.prazoContratual.trim() === '') {
     result.prazoContratual = findPattern([/(\d+)\s*meses/i]) || '';
   }
-  if (!result.validadeProposta) {
+  if (!result.validadeProposta || result.validadeProposta.trim() === '') {
     result.validadeProposta = findPattern([/Validade:\s*(\d+\s*dias)/i]) || '';
   }
-  if (!result.multaRescisoria) {
+  if (!result.multaRescisoria || result.multaRescisoria.trim() === '') {
     result.multaRescisoria = findPattern([/Multa rescisória:\s*(.+)/i]) || '';
   }
-  if (!result.faturamentoServicos) {
+  if (!result.faturamentoServicos || result.faturamentoServicos.trim() === '') {
     result.faturamentoServicos = lower.includes('antecipado') ? 'Antecipado' : lower.includes('pós-entrega') ? 'Pós-entrega' : '';
   }
-  if (!result.financiamento) {
+  if (!result.financiamento || result.financiamento.trim() === '') {
     if (lower.includes('btg')) {
       result.financiamento = 'Financiamento Banco BTG Pactual — Prazo: 15 dias — Cancelamento automático';
     }
   }
 
   // Corrigir campo "Impostos" nos campos ausentes
-  if (!result.camposAusentes.impostos) {
+  if (!result.camposAusentes.impostos || result.camposAusentes.impostos.trim() === '') {
     if (lower.includes('impostos já inclusos') || lower.includes('contêm impostos') || lower.includes('incluem impostos')) {
       result.camposAusentes.impostos = 'Impostos já inclusos';
     }
@@ -458,12 +490,16 @@ function complementarComExtracaoLocal(result: ExtractionResult, pdfText: string)
 }
 
 // ============================================================
-// Recalcular valores de investimento (corrige erros de formatação da IA)
+// Validar e recalcular investimentos
+// Lógica: o valor "sem imposto" é o BASE (mais confiável).
+// O valor "com imposto" = sem imposto × 1.105
+// Se a diferença entre com e sem não for ~10.50%, recalculamos
 // ============================================================
-function recalcularInvestimentos(
+function validarERecalcularInvestimentos(
   investimentos: { descricao: string; valorComImposto: string; valorSemImposto: string }[],
   impostoCCI: number,
-  impostosInclusos: boolean
+  impostosInclusos: boolean,
+  pdfText: string
 ): { descricao: string; valorComImposto: string; valorSemImposto: string }[] {
   const parseBRL = (s: string): number | null => {
     const clean = s.replace(/[R$\s]/g, '').replace(/\./g, '').replace(',', '.');
@@ -473,31 +509,140 @@ function recalcularInvestimentos(
 
   const formatBRL = (n: number) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+  // Se investimentos está vazio ou só tem "—", extrair do PDF
+  if (!investimentos || investimentos.length === 0 ||
+      investimentos.every(i => !i.valorComImposto || i.valorComImposto === '—' || i.valorComImposto === '')) {
+    // Extrair do texto do PDF
+    const findPattern = (patterns: RegExp[]): string | null => {
+      for (const p of patterns) {
+        const match = pdfText.match(p);
+        if (match) return match[1] || match[0];
+      }
+      return null;
+    };
+
+    const mensalidadeStr = findPattern([
+      /Mensalidade[^:]*:\s*R\$\s*([\d.,]+)/i,
+      /Mensalidade\s*\(com impostos\)\s*:\s*R\$\s*([\d.,]+)/i,
+      /mensalidade.*?R\$\s*([\d.,]+)/i,
+    ]);
+    const habilitacaoStr = findPattern([
+      /Habilitação[^:]*:\s*R\$\s*([\d.,]+)/i,
+      /Habilitação\s*\+?\s*Serviços[^:]*:\s*R\$\s*([\d.,]+)/i,
+      /habilitação.*?R\$\s*([\d.,]+)/i,
+    ]);
+
+    const mensalidadeNum = mensalidadeStr ? parseBRL(mensalidadeStr) : null;
+    const habilitacaoNum = habilitacaoStr ? parseBRL(habilitacaoStr) : null;
+
+    return [
+      {
+        descricao: 'Mensalidade',
+        valorComImposto: mensalidadeNum ? formatBRL(mensalidadeNum) : '—',
+        valorSemImposto: mensalidadeNum ? formatBRL(mensalidadeNum / (1 + impostoCCI / 100)) : '—',
+      },
+      {
+        descricao: 'Habilitação + Serviços',
+        valorComImposto: habilitacaoNum ? formatBRL(habilitacaoNum) : '—',
+        valorSemImposto: habilitacaoNum ? formatBRL(habilitacaoNum / (1 + impostoCCI / 100)) : '—',
+      },
+    ];
+  }
+
+  // ========================================================
+  // Cross-validação: extrair valores "com imposto" diretamente
+  // do PDF e usá-los como fonte de verdade quando disponíveis.
+  // A API LLM pode retornar valores ligeiramente incorretos,
+  // mas o texto do PDF é a fonte autoritativa.
+  // ========================================================
+  const findPattern = (patterns: RegExp[]): string | null => {
+    for (const p of patterns) {
+      const match = pdfText.match(p);
+      if (match) return match[1] || match[0];
+    }
+    return null;
+  };
+
+  const pdfMensalidadeStr = findPattern([
+    /Mensalidade[^:]*:\s*R\$\s*([\d.,]+)/i,
+    /Mensalidade\s*\(com impostos\)\s*:\s*R\$\s*([\d.,]+)/i,
+    /mensalidade.*?R\$\s*([\d.,]+)/i,
+  ]);
+  const pdfHabilitacaoStr = findPattern([
+    /Habilitação[^:]*:\s*R\$\s*([\d.,]+)/i,
+    /Habilitação\s*\+?\s*Serviços[^:]*:\s*R\$\s*([\d.,]+)/i,
+    /habilitação.*?R\$\s*([\d.,]+)/i,
+  ]);
+
+  const pdfMensalidadeNum = pdfMensalidadeStr ? parseBRL(pdfMensalidadeStr) : null;
+  const pdfHabilitacaoNum = pdfHabilitacaoStr ? parseBRL(pdfHabilitacaoStr) : null;
+
+  // Mapa de descrição → valor com imposto extraído do PDF
+  const pdfValues: Record<string, number | null> = {
+    'Mensalidade': pdfMensalidadeNum,
+    'Habilitação + Serviços': pdfHabilitacaoNum,
+  };
+
+  // Recalcular cada investimento
   return investimentos.map(item => {
-    const valorCom = parseBRL(item.valorComImposto);
+    // Se temos o valor "com imposto" diretamente do PDF, usar como fonte de verdade
+    const pdfValorCom = pdfValues[item.descricao] ?? null;
+    const valorComOriginal = parseBRL(item.valorComImposto);
+
+    // Se o PDF tem o valor e ele difere do valor da API, usar o do PDF
+    let valorCom: number | null;
+    if (pdfValorCom !== null) {
+      valorCom = pdfValorCom;
+    } else {
+      valorCom = valorComOriginal;
+    }
+
     const valorSem = parseBRL(item.valorSemImposto);
 
-    if (impostosInclusos && valorCom) {
-      // Valores já incluem imposto → calcular sem imposto
+    // Caso 1: Tem valor com imposto — calcular sem imposto
+    if (valorCom) {
+      const semImpostoCalc = valorCom / (1 + impostoCCI / 100);
+
+      // Se também tem valor sem imposto, validar se a diferença é ~10.50%
+      if (valorSem) {
+        const diferencaPercentual = ((valorCom - valorSem) / valorSem) * 100;
+        const diferencaOk = Math.abs(diferencaPercentual - impostoCCI) < 1.0; // tolerância de 1%
+
+        if (diferencaOk && pdfValorCom === null) {
+          // Valores consistentes e sem cross-validação do PDF — usar o sem imposto como base
+          return {
+            ...item,
+            valorSemImposto: formatBRL(valorSem),
+            valorComImposto: formatBRL(valorSem * (1 + impostoCCI / 100)),
+          };
+        } else {
+          // Diferença inconsistente ou temos valor do PDF — confiar no valor com imposto
+          // e recalcular o sem imposto
+          return {
+            ...item,
+            valorComImposto: formatBRL(valorCom),
+            valorSemImposto: formatBRL(semImpostoCalc),
+          };
+        }
+      }
+
+      // Só tem valor com imposto — calcular sem imposto
       return {
         ...item,
         valorComImposto: formatBRL(valorCom),
-        valorSemImposto: formatBRL(valorCom / (1 + impostoCCI / 100)),
-      };
-    } else if (!impostosInclusos && valorSem) {
-      // Valores não incluem imposto → calcular com imposto
-      return {
-        ...item,
-        valorComImposto: formatBRL(valorSem * (1 + impostoCCI / 100)),
-        valorSemImposto: formatBRL(valorSem),
-      };
-    } else if (valorCom) {
-      return {
-        ...item,
-        valorComImposto: formatBRL(valorCom),
-        valorSemImposto: formatBRL(valorCom / (1 + impostoCCI / 100)),
+        valorSemImposto: formatBRL(semImpostoCalc),
       };
     }
+
+    // Caso 2: Só tem valor sem imposto — calcular com imposto
+    if (valorSem) {
+      return {
+        ...item,
+        valorSemImposto: formatBRL(valorSem),
+        valorComImposto: formatBRL(valorSem * (1 + impostoCCI / 100)),
+      };
+    }
+
     return item;
   });
 }

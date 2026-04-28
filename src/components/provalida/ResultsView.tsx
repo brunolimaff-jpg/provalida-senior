@@ -192,6 +192,26 @@ function InvestmentSection({ investimentos, impostoCCI, impostosInclusos }: { in
 
   const impostoConfirmado = impostoCCI === 10.50 || impostoCCI === 10.5;
 
+  // Validar se a diferença entre com e sem imposto é ~10.50%
+  const parseBRL = (s: string): number | null => {
+    const clean = s.replace(/[R$\s]/g, '').replace(/\./g, '').replace(',', '.');
+    const n = parseFloat(clean);
+    return isNaN(n) ? null : n;
+  };
+
+  const validacoes = investimentos.map(item => {
+    const com = parseBRL(item.valorComImposto);
+    const sem = parseBRL(item.valorSemImposto);
+    if (com && sem && sem > 0) {
+      const diferenca = ((com - sem) / sem) * 100;
+      const ok = Math.abs(diferenca - impostoCCI) < 1.0;
+      return { ok, diferenca: diferenca.toFixed(2) };
+    }
+    return { ok: true, diferenca: '—' };
+  });
+
+  const todasValidacoesOk = validacoes.every(v => v.ok);
+
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm overflow-hidden">
       {/* Header */}
@@ -199,7 +219,7 @@ function InvestmentSection({ investimentos, impostoCCI, impostosInclusos }: { in
         <DollarSign className="h-4 w-4 text-[#01696f]" />
         <h3 className="text-sm font-bold text-[var(--text)]">3. INVESTIMENTO</h3>
 
-        {/* Badge de confirmação do imposto */}
+        {/* Badges */}
         <div className="ml-auto flex items-center gap-1.5">
           {impostoConfirmado ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-[#d4dfcc] px-2.5 py-0.5 text-[10px] font-semibold text-[#437a22]">
@@ -210,6 +230,15 @@ function InvestmentSection({ investimentos, impostoCCI, impostosInclusos }: { in
               <AlertTriangle className="h-3 w-3" /> CCI {impostoCCI}% — verificar
             </span>
           )}
+          {todasValidacoesOk ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#d4dfcc] px-2.5 py-0.5 text-[10px] font-semibold text-[#437a22]">
+              <Shield className="h-3 w-3" /> Diferença validada
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#e0ced7] px-2.5 py-0.5 text-[10px] font-semibold text-[#a12c7b]">
+              <AlertTriangle className="h-3 w-3" /> Diferença inconsistente
+            </span>
+          )}
         </div>
       </div>
 
@@ -217,8 +246,8 @@ function InvestmentSection({ investimentos, impostoCCI, impostosInclusos }: { in
       <div className="px-5 py-2.5 border-b border-[var(--border)] bg-[#cedcd8]/20">
         <p className="text-[10px] text-[var(--text)]">
           {impostosInclusos
-            ? `Os valores JÁ INCLUEM ${impostoCCI}% de imposto CCI. Valores sem imposto calculados dividindo por ${(1 + impostoCCI / 100).toFixed(3)}.`
-            : `Os valores NÃO INCLUEM ${impostoCCI}% de imposto CCI. Valores com imposto calculados multiplicando por ${(1 + impostoCCI / 100).toFixed(3)}.`
+            ? `Valores JÁ INCLUEM ${impostoCCI}% de imposto CCI. O valor "sem imposto" é o base, calculado dividindo por ${(1 + impostoCCI / 100).toFixed(3)}. A diferença entre "com imposto" e "sem imposto" deve ser de ~${impostoCCI}%.`
+            : `Valores NÃO INCLUEM ${impostoCCI}% de imposto CCI. O valor "com imposto" = sem imposto × ${(1 + impostoCCI / 100).toFixed(3)}. A diferença deve ser de ~${impostoCCI}%.`
           }
         </p>
       </div>
@@ -232,6 +261,7 @@ function InvestmentSection({ investimentos, impostoCCI, impostosInclusos }: { in
                 <th className="pb-3 text-left text-[10px] font-semibold text-[var(--muted)] uppercase tracking-wider">Item</th>
                 <th className="pb-3 text-right text-[10px] font-semibold text-[#437a22] uppercase tracking-wider">Com Imposto</th>
                 <th className="pb-3 text-right text-[10px] font-semibold text-[#964219] uppercase tracking-wider">Sem Imposto</th>
+                <th className="pb-3 text-right text-[10px] font-semibold text-[var(--muted)] uppercase tracking-wider">Diferença</th>
               </tr>
             </thead>
             <tbody>
@@ -240,6 +270,13 @@ function InvestmentSection({ investimentos, impostoCCI, impostosInclusos }: { in
                   <td className="py-3 text-sm font-medium text-[var(--text)]">{item.descricao}</td>
                   <td className="py-3 text-right text-sm font-bold text-[#437a22]">{item.valorComImposto}</td>
                   <td className="py-3 text-right text-sm font-semibold text-[#964219]">{item.valorSemImposto}</td>
+                  <td className="py-3 text-right text-xs">
+                    {validacoes[i]?.ok ? (
+                      <span className="text-[#437a22] font-medium">{validacoes[i].diferenca}%</span>
+                    ) : (
+                      <span className="text-[#a12c7b] font-semibold">{validacoes[i].diferenca}% ⚠</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

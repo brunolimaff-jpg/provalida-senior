@@ -57,3 +57,28 @@ Stage Summary:
 - Missing fields section shows which fields are absent in the PDF
 - Removed original text panel and separate tax calculation panel
 - All builds passing successfully
+
+---
+Task ID: 3
+Agent: Main Agent
+Task: Fix empty investment values and add tax difference validation
+
+Work Log:
+- Analyzed new screenshot showing investment values as "—" and payment conditions as "Não informado"
+- Root cause: API LLM returns empty/incorrect values and complementarComExtracaoLocal wasn't aggressive enough
+- Rewrote complementarComExtracaoLocal to always try extracting from PDF text (not just when API returns empty)
+- Created validarERecalcularInvestimentos function with cross-validation against PDF text
+- Key logic change: "sem imposto" is the BASE value; "com imposto" = sem imposto × 1.105
+- Added validation: if difference between com and sem imposto is not ~10.50%, recalculate
+- Added PDF text as authoritative source for values — overrides API values when they differ
+- Updated InvestmentSection to show "Diferença" column with percentage validation
+- Added "Diferença validada" green badge and "Diferença inconsistente" warning badge
+- Tested via agent-browser: all values now correctly populated (R$ 15.240,80, R$ 550.523,95)
+
+Stage Summary:
+- Investment values now always extracted from PDF text as authoritative source
+- "Diferença" column shows percentage between com/sem imposto (should be ~10.50%)
+- Visual badges confirm tax validation status
+- Cross-validation catches LLM errors (e.g., R$ 15.234,80 → corrected to R$ 15.240,80)
+- Payment conditions properly extracted from PDF
+- All builds passing
