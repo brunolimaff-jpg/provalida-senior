@@ -79,7 +79,7 @@ export default function ValidationItem({ item, onApplyCorrection, onCopySuggesti
           {item.categoria}
         </span>
         <ChevronDown
-          className={`h-4 w-4 shrink-0 text-[var(--muted)] transition-transform duration-180 ${
+          className={`h-4 w-4 shrink-0 text-[var(--muted-foreground)] transition-transform duration-180 ${
             isOpen ? 'rotate-180' : ''
           }`}
         />
@@ -91,14 +91,14 @@ export default function ValidationItem({ item, onApplyCorrection, onCopySuggesti
           {/* Valor CRM */}
           {item.valorCRM && (
             <div className="text-xs">
-              <span className="font-medium text-[var(--muted)]">Valor CRM:</span>{' '}
+              <span className="font-medium text-[var(--muted-foreground)]">Valor CRM:</span>{' '}
               <span className="text-[var(--text)]">{item.valorCRM}</span>
             </div>
           )}
 
           {/* Evidência PDF */}
           <div className="text-xs">
-            <span className="font-medium text-[var(--muted)]">Evidência PDF:</span>{' '}
+            <span className="font-medium text-[var(--muted-foreground)]">Evidência PDF:</span>{' '}
             <span className="text-[var(--text)]">{item.evidenciaPDF}</span>
           </div>
 
@@ -116,7 +116,7 @@ export default function ValidationItem({ item, onApplyCorrection, onCopySuggesti
           {item.sugestao && (
             <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-2 space-y-2">
               <p className="text-xs font-medium text-[var(--text)]">💡 Sugestão:</p>
-              <p className="text-xs text-[var(--muted)]">{item.sugestao}</p>
+              <p className="text-xs text-[var(--muted-foreground)]">{item.sugestao}</p>
               <div className="flex gap-2">
                 {!item.corrigido && item.status !== 'ok' && (
                   <button

@@ -37,8 +37,8 @@ export default function RateioTable({ contas, onChange }: RateioTableProps) {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-[var(--background)]">
-              <th className="px-3 py-2 text-left font-medium text-[var(--muted)]">Conta</th>
-              <th className="w-32 px-3 py-2 text-left font-medium text-[var(--muted)]">Percentual %</th>
+              <th className="px-3 py-2 text-left font-medium text-[var(--muted-foreground)]">Conta</th>
+              <th className="w-32 px-3 py-2 text-left font-medium text-[var(--muted-foreground)]">Percentual %</th>
               <th className="w-10 px-3 py-2"></th>
             </tr>
           </thead>
@@ -70,7 +70,7 @@ export default function RateioTable({ contas, onChange }: RateioTableProps) {
                   <button
                     onClick={() => handleRemoveRow(conta.id)}
                     disabled={contas.length <= 1}
-                    className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--muted)] hover:bg-[#e0ced7] hover:text-[#a12c7b] disabled:opacity-30 disabled:cursor-not-allowed transition-colors duration-180"
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--muted-foreground)] hover:bg-[#e0ced7] hover:text-[#a12c7b] disabled:opacity-30 disabled:cursor-not-allowed transition-colors duration-180"
                     aria-label="Remover linha"
                   >
                     <X className="h-3.5 w-3.5" />

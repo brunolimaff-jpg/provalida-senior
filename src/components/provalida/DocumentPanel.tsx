@@ -19,7 +19,7 @@ export default function DocumentPanel({ pdfText, correctedText, activeTab, onTab
           className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors duration-180 ${
             activeTab === 'original'
               ? 'border-b-2 border-[#01696f] text-[#01696f]'
-              : 'text-[var(--muted)] hover:text-[var(--text)]'
+              : 'text-[var(--muted-foreground)] hover:text-[var(--text)]'
           }`}
         >
           <FileText className="h-4 w-4" />
@@ -30,7 +30,7 @@ export default function DocumentPanel({ pdfText, correctedText, activeTab, onTab
           className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors duration-180 ${
             activeTab === 'corrected'
               ? 'border-b-2 border-[#01696f] text-[#01696f]'
-              : 'text-[var(--muted)] hover:text-[var(--text)]'
+              : 'text-[var(--muted-foreground)] hover:text-[var(--text)]'
           }`}
         >
           <FilePenLine className="h-4 w-4" />
@@ -51,7 +51,7 @@ export default function DocumentPanel({ pdfText, correctedText, activeTab, onTab
               {pdfText}
             </pre>
           ) : (
-            <p className="py-8 text-center text-sm text-[var(--muted)]">
+            <p className="py-8 text-center text-sm text-[var(--muted-foreground)]">
               Nenhum texto extraído do PDF
             </p>
           )
@@ -60,7 +60,7 @@ export default function DocumentPanel({ pdfText, correctedText, activeTab, onTab
             {correctedText}
           </pre>
         ) : (
-          <p className="py-8 text-center text-sm text-[var(--muted)]">
+          <p className="py-8 text-center text-sm text-[var(--muted-foreground)]">
             Nenhuma correção aplicada ainda. Clique em &quot;Aplicar&quot; nas sugestões para gerar o texto corrigido.
           </p>
         )}

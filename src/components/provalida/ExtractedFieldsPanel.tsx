@@ -61,7 +61,7 @@ export default function ExtractedFieldsPanel({ campos, rateio, observacaoRateio 
 
       {/* Legenda */}
       <div className="rounded-lg bg-[var(--surface)] border border-[var(--border)] p-3">
-        <p className="text-[10px] font-semibold text-[var(--muted)] uppercase tracking-wider mb-2">Legenda</p>
+        <p className="text-[10px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-2">Legenda</p>
         <div className="grid grid-cols-3 gap-2">
           <div className="flex items-center gap-1.5">
             <CheckCircle className="h-3 w-3 text-[#437a22]" />
@@ -104,7 +104,7 @@ export default function ExtractedFieldsPanel({ campos, rateio, observacaoRateio 
                   <p className="mt-1 text-xs text-[#a12c7b] italic">Campo não encontrado no PDF — verificar no CRM</p>
                 )}
                 {campo.trechoPDF && (
-                  <p className="mt-1 text-[10px] text-[var(--muted)] truncate" title={campo.trechoPDF}>
+                  <p className="mt-1 text-[10px] text-[var(--muted-foreground)] truncate" title={campo.trechoPDF}>
                     📎 &quot;{campo.trechoPDF}&quot;
                   </p>
                 )}
@@ -122,9 +122,9 @@ export default function ExtractedFieldsPanel({ campos, rateio, observacaoRateio 
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-[var(--border)]">
-                  <th className="pb-2 text-left font-medium text-[var(--muted)]">Conta</th>
-                  <th className="pb-2 text-left font-medium text-[var(--muted)]">Tipo</th>
-                  <th className="pb-2 text-right font-medium text-[var(--muted)]">Percentual</th>
+                  <th className="pb-2 text-left font-medium text-[var(--muted-foreground)]">Conta</th>
+                  <th className="pb-2 text-left font-medium text-[var(--muted-foreground)]">Tipo</th>
+                  <th className="pb-2 text-right font-medium text-[var(--muted-foreground)]">Percentual</th>
                 </tr>
               </thead>
               <tbody>
@@ -139,7 +139,7 @@ export default function ExtractedFieldsPanel({ campos, rateio, observacaoRateio 
             </table>
           </div>
           {observacaoRateio && (
-            <p className="mt-2 text-[10px] text-[var(--muted)]">Obs: {observacaoRateio}</p>
+            <p className="mt-2 text-[10px] text-[var(--muted-foreground)]">Obs: {observacaoRateio}</p>
           )}
         </div>
       )}

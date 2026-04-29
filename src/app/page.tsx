@@ -39,7 +39,7 @@ export default function ProValidaApp() {
   } = useProposalAnalysis();
 
   return (
-    <div className="min-h-screen flex flex-col bg-[var(--background)]">
+    <div className={`min-h-screen flex flex-col ${currentView === 'results' ? 'bg-white' : 'bg-[var(--background)]'}`}>
       <Topbar
         currentView={currentView}
         theme={theme}
@@ -80,12 +80,12 @@ export default function ProValidaApp() {
         )}
       </main>
 
-      <footer className="mt-auto border-t border-[var(--border)] bg-[var(--surface)] py-3">
+      <footer className={`mt-auto border-t border-[var(--border)] py-3 ${currentView === 'results' ? 'bg-white' : 'bg-[var(--surface)]'}`}>
         <div className="mx-auto max-w-7xl px-4 sm:px-6 flex items-center justify-between">
-          <p className="text-[10px] text-[var(--muted)]">
+          <p className="text-[10px] text-[var(--muted-foreground)]">
             ProValida Senior © {new Date().getFullYear()} — Senior Sistemas S/A
           </p>
-          <p className="text-[10px] text-[var(--muted)]">
+          <p className="text-[10px] text-[var(--muted-foreground)]">
             Validação inteligente de propostas comerciais
           </p>
         </div>

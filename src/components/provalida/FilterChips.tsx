@@ -18,7 +18,7 @@ export default function FilterChips({ activeFilter, onFilterChange, categories }
           className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors duration-180 ${
             activeFilter === filter
               ? 'bg-[#01696f] text-white'
-              : 'bg-[var(--background)] text-[var(--muted)] border border-[var(--border)] hover:bg-[#cedcd8] hover:text-[#01696f]'
+              : 'bg-[var(--background)] text-[var(--muted-foreground)] border border-[var(--border)] hover:bg-[#cedcd8] hover:text-[#01696f]'
           }`}
         >
           {filter}

@@ -237,7 +237,7 @@ export function useProposalAnalysis() {
     if (!validationResult) return;
     try {
       const numero = extraction?.codigoProposta || 'proposta';
-      exportPDF(validationResult, numero);
+      exportPDF(validationResult, numero, extraction || undefined);
       toast.success('Relatório PDF exportado');
     } catch {
       toast.error('Erro ao gerar PDF');
@@ -245,10 +245,10 @@ export function useProposalAnalysis() {
   }, []);
 
   const handleExportCSV = useCallback(() => {
-    const { validationResult } = stateRef.current;
+    const { validationResult, extraction } = stateRef.current;
     if (!validationResult) return;
     try {
-      exportCSV(validationResult);
+      exportCSV(validationResult, extraction || undefined);
       toast.success('Checklist CSV exportado');
     } catch {
       toast.error('Erro ao gerar CSV');

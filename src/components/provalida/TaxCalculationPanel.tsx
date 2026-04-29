@@ -42,7 +42,7 @@ export default function TaxCalculationPanel({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[var(--border)]">
-              <th className="pb-2 text-left text-[10px] font-semibold text-[var(--muted)] uppercase tracking-wider">Item</th>
+              <th className="pb-2 text-left text-[10px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">Item</th>
               <th className="pb-2 text-right text-[10px] font-semibold text-[#437a22] uppercase tracking-wider">Com Imposto</th>
               <th className="pb-2 text-right text-[10px] font-semibold text-[#964219] uppercase tracking-wider">Sem Imposto</th>
             </tr>

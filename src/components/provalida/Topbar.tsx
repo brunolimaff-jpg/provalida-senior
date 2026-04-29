@@ -49,7 +49,7 @@ export default function Topbar({ currentView, theme, onToggleTheme }: TopbarProp
                       ? 'bg-[#01696f] text-white'
                       : isCompleted
                       ? 'bg-[#cedcd8] text-[#01696f]'
-                      : 'bg-[var(--background)] text-[var(--muted)]'
+                      : 'bg-[var(--background)] text-[var(--muted-foreground)]'
                   }`}
                 >
                   {isCompleted && (
@@ -67,7 +67,7 @@ export default function Topbar({ currentView, theme, onToggleTheme }: TopbarProp
         {/* Toggle de tema */}
         <button
           onClick={onToggleTheme}
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--background)] text-[var(--muted)] transition-colors duration-180 hover:bg-[var(--surface)] hover:text-[var(--text)]"
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--background)] text-[var(--muted-foreground)] transition-colors duration-180 hover:bg-[var(--surface)] hover:text-[var(--text)]"
           aria-label={theme === 'dark' ? 'Ativar modo claro' : 'Ativar modo escuro'}
         >
           {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
