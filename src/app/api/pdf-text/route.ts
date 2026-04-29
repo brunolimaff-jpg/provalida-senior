@@ -1,4 +1,6 @@
+import fs from 'node:fs';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { NextRequest, NextResponse } from 'next/server';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
@@ -15,17 +17,27 @@ interface TextItem {
   width: number;
 }
 
-function getStandardFontDataUrl(): string {
-  const standardFontsPath = path.join(process.cwd(), 'node_modules/pdfjs-dist/standard_fonts') + path.sep;
-  return pathToFileURL(standardFontsPath).href;
-}
+// Resolve os arquivos do pdfjs-dist via package resolution em vez de
+// `process.cwd()` — em ambientes serverless (Vercel) o cwd é `/var/task`
+// e o caminho relativo nem sempre aponta para o bundle correto.
+// A resolução é lazy para não falhar durante o collect-page-data do build.
+let pdfjsAssetsCache: { standardFontDataUrl: string; workerSrcConfigured: boolean } | null = null;
 
-function getWorkerSrc(): string {
-  const workerPath = path.join(process.cwd(), 'node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs');
-  return pathToFileURL(workerPath).href;
+function resolvePdfjsAssets(): { standardFontDataUrl: string } {
+  if (pdfjsAssetsCache) return pdfjsAssetsCache;
+  const requireFromHere = createRequire(import.meta.url);
+  const pdfjsPackageRoot = path.dirname(requireFromHere.resolve('pdfjs-dist/package.json'));
+  const standardFontsDir = path.join(pdfjsPackageRoot, 'standard_fonts');
+  const workerFilePath = path.join(pdfjsPackageRoot, 'legacy/build/pdf.worker.mjs');
+  const standardFontDataUrl = pathToFileURL(standardFontsDir + path.sep).href;
+  let workerSrcConfigured = false;
+  if (fs.existsSync(workerFilePath)) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = pathToFileURL(workerFilePath).href;
+    workerSrcConfigured = true;
+  }
+  pdfjsAssetsCache = { standardFontDataUrl, workerSrcConfigured };
+  return pdfjsAssetsCache;
 }
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = getWorkerSrc();
 
 function appendPageText(items: unknown[]): string {
   const lineMap = new Map<string, TextItem[]>();
@@ -96,10 +108,12 @@ export async function POST(request: NextRequest) {
 
     const arrayBuffer = await file.arrayBuffer();
     const pdfBytes = new Uint8Array(arrayBuffer);
+    const { standardFontDataUrl } = resolvePdfjsAssets();
     const pdf = await pdfjsLib.getDocument({
       data: pdfBytes,
-      standardFontDataUrl: getStandardFontDataUrl(),
+      standardFontDataUrl,
       verbosity: 0,
+      useSystemFonts: true,
     }).promise;
 
     let text = '';
