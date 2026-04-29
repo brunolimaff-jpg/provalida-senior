@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { WorkerMessageHandler } from 'pdfjs-dist/legacy/build/pdf.worker.mjs';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -11,6 +12,14 @@ interface TextItem {
   x: number;
   y: number;
   width: number;
+}
+
+function configurePdfWorker() {
+  const pdfGlobal = globalThis as typeof globalThis & {
+    pdfjsWorker?: { WorkerMessageHandler: typeof WorkerMessageHandler };
+  };
+
+  pdfGlobal.pdfjsWorker ??= { WorkerMessageHandler };
 }
 
 function appendPageText(items: unknown[]): string {
@@ -82,12 +91,12 @@ export async function POST(request: NextRequest) {
 
     const arrayBuffer = await file.arrayBuffer();
     const pdfBytes = new Uint8Array(arrayBuffer);
+    configurePdfWorker();
     const pdf = await pdfjsLib.getDocument({
       data: pdfBytes,
-      disableWorker: true,
       verbosity: 0,
       useSystemFonts: true,
-    } as Parameters<typeof pdfjsLib.getDocument>[0] & { disableWorker: boolean }).promise;
+    }).promise;
 
     let text = '';
 
