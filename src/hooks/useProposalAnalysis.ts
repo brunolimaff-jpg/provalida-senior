@@ -152,6 +152,14 @@ export function useProposalAnalysis() {
       } catch (err) {
         console.log('API de extração indisponível, usando extração local...', err);
         extractionResult = extractFieldsLocally(pdfText);
+        // Complementar dados faltantes com extração local (garantir consistência)
+        extractionResult = complementarComExtracaoLocal(extractionResult, pdfText);
+        extractionResult.investimentos = validarERecalcularInvestimentos(
+          extractionResult.investimentos || [],
+          extractionResult.impostoCCI || 10.50,
+          extractionResult.impostosInclusos ?? true,
+          pdfText
+        );
       }
 
       // Passo 2: Validar campos extraídos via API
