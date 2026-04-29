@@ -82,14 +82,26 @@ function complementarInvestimentos(result: ExtractionResult, pdfText: string): v
 // Complementar condições de pagamento
 // ============================================================
 
+function isPlaceholderCondicao(text: string): boolean {
+  if (!text) return true;
+  const lower = text.toLowerCase();
+  // Detectar texto placeholder que a API LLM retorna quando não encontra o valor real
+  return lower.includes('descreva as condições') ||
+         lower.includes('descreva as condicoes') ||
+         lower.includes('não informado ou o valor') ||
+         lower.includes('nao informado ou o valor') ||
+         lower.trim() === '';
+}
+
 function complementarCondicoes(result: ExtractionResult, pdfText: string): void {
-  const condicoesTemValores = result.condicoes && result.condicoes.length > 0 &&
-    result.condicoes.some(c => c.condicao && c.condicao.trim() !== '');
+  // SEMPRE extrair condições do PDF para ter dados reais
+  const condicoesExtraidas = extrairCondicoesDoPDF(pdfText);
 
-  if (!condicoesTemValores) {
-    console.log('[ProValida] Condições sem valores, extraindo do PDF...');
-    const condicoesExtraidas = extrairCondicoesDoPDF(pdfText);
+  const condicoesTemValoresReais = result.condicoes && result.condicoes.length > 0 &&
+    result.condicoes.some(c => c.condicao && !isPlaceholderCondicao(c.condicao));
 
+  if (!condicoesTemValoresReais) {
+    console.log('[ProValida] Condições sem valores reais, usando extração do PDF...');
     result.condicoes = [
       {
         tipo: 'Mensalidade',
@@ -105,18 +117,21 @@ function complementarCondicoes(result: ExtractionResult, pdfText: string): void 
       },
     ];
   } else {
-    // Mesmo tendo condições, complementar descontos se estiverem vazios
-    const condicoesExtraidas = extrairCondicoesDoPDF(pdfText);
+    // Complementar campos vazios ou placeholder com dados do PDF
     for (const cond of result.condicoes) {
+      // Sobrescrever se for placeholder
+      if (isPlaceholderCondicao(cond.condicao)) {
+        if (cond.tipo === 'Mensalidade') {
+          cond.condicao = condicoesExtraidas.condicaoMensalidade;
+        } else if (cond.tipo === 'Habilitação + Serviços') {
+          cond.condicao = condicoesExtraidas.condicaoHabilitacao;
+        }
+      }
       if (!cond.descontoHabilitacao || cond.descontoHabilitacao.trim() === '' || cond.descontoHabilitacao === 'Não informado') {
         cond.descontoHabilitacao = condicoesExtraidas.descontoHabilitacao;
       }
       if (!cond.descontoServicos || cond.descontoServicos.trim() === '' || cond.descontoServicos === 'Não informado') {
         cond.descontoServicos = condicoesExtraidas.descontoServicos;
-      }
-      // Se cond.condicao está vazio mas temos extração local, preencher
-      if ((!cond.condicao || cond.condicao.trim() === '') && cond.tipo === 'Mensalidade') {
-        cond.condicao = condicoesExtraidas.condicaoMensalidade;
       }
       if ((!cond.condicao || cond.condicao.trim() === '') && cond.tipo === 'Habilitação + Serviços') {
         cond.condicao = condicoesExtraidas.condicaoHabilitacao;
