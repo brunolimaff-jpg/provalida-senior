@@ -139,10 +139,21 @@ function escapeRegex(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+export function normalizeExtractedPdfText(text: string): string {
+  return text
+    .replace(/\bR\s*\$\s*/g, 'R$ ')
+    .replace(/(R\$\s*)([\d.\s]+,\s*\d{2})/g, (_match, prefix: string, value: string) => {
+      return `${prefix}${value.replace(/\s+/g, '')}`;
+    })
+    .replace(/\b(\d{2})\.(\d{3})\.(\d{3})\/(\d{4})\s*-\s*(\d{2})\b/g, '$1.$2.$3/$4-$5')
+    .replace(/\b(Dados do cliente|Raz[aã]o Social|Cliente|Contratante|Endere[cç]o|CNPJ)\s+:/gi, '$1:');
+}
+
 /**
  * Extrai seção numerada exata, evitando colisões com palavras soltas no corpo.
  */
 export function extrairSecaoNumerada(pdfText: string, numero: number, titulo: string): string {
+  pdfText = normalizeExtractedPdfText(pdfText);
   const normalized = normalizeForSearch(pdfText);
   const normalizedTitle = normalizeForSearch(titulo);
   const titlePattern = normalizedTitle
@@ -167,6 +178,7 @@ export function extrairSecaoNumerada(pdfText: string, numero: number, titulo: st
 }
 
 export function extrairSecaoPorTitulo(pdfText: string, titulo: string): string {
+  pdfText = normalizeExtractedPdfText(pdfText);
   const normalized = normalizeForSearch(pdfText);
   const normalizedTitle = normalizeForSearch(titulo);
   const titlePattern = normalizedTitle
@@ -317,6 +329,11 @@ function inferPackageStage(description: string): 'Início' | 'Execução' | 'Fin
 }
 
 function sanitizePackageText(text: string): string {
+  const packageStart = text.search(/(?:%\s*Percentual\s+FASES|FASES\s+M[ií]nimo|Etapa\s+Marco\/Pacote|01\s*[–-]\s*Aceite|In[ií]cio\s+Aceite)/i);
+  if (packageStart >= 0) {
+    text = text.slice(packageStart);
+  }
+
   const stopPattern = /(?:até o\s*12|do\s*13|do\s*25|valor hora|profissionais senior|sofrer[áa]\s+um adicional|acrescido|multa|rescis[ãa]o|reajuste)/i;
   const lines = text.split('\n');
   const result: string[] = [];
@@ -331,6 +348,7 @@ function sanitizePackageText(text: string): string {
 
 function cleanPackageMarcoDescription(description: string): string {
   return description
+    .replace(/^\d+\s*(?:\d+\s*)?[–-]\s*/i, '')
     .replace(/^(?:Início|Inicio|Execução|Execucao|Finalização|Finalizacao)\s+/i, '')
     .replace(/^»\s*/, '')
     .replace(/^(?:MENSALIDADE|SaaS|SERVI[ÇC]OS|Escopo Fechado)\s+/i, '')
@@ -421,6 +439,7 @@ function parsePackageStages(text: string) {
 }
 
 export function extrairInvestimentosDetalhadosDoPDF(pdfText: string): ParsedInvestment[] {
+  pdfText = normalizeExtractedPdfText(pdfText);
   const secaoInvestimento = extrairSecaoPorTitulo(pdfText, 'INVESTIMENTO') ||
     extrairSecaoNumerada(pdfText, 3, 'INVESTIMENTO') ||
     extrairSecao(pdfText, 'investimento', ['\n4.', '\n5.']);
@@ -495,6 +514,7 @@ export function extrairInvestimentosDetalhadosDoPDF(pdfText: string): ParsedInve
  * Usa múltiplas estratégias para máxima compatibilidade.
  */
 export function extrairInvestimentoDoPDF(pdfText: string): InvestimentoExtraido {
+  pdfText = normalizeExtractedPdfText(pdfText);
   const detalhados = extrairInvestimentosDetalhadosDoPDF(pdfText);
   const mensalidadeDetalhada = detalhados.find(item => item.descricao === 'Mensalidade');
   const habilitacaoDetalhada = detalhados.find(item => item.descricao === 'Habilitação + Serviços');
@@ -667,6 +687,7 @@ export function extrairInvestimentoDoPDF(pdfText: string): InvestimentoExtraido 
  * ROBUSTO: Múltiplas estratégias para funcionar com diferentes formatos de PDF.
  */
 export function extrairCondicoesDoPDF(pdfText: string): CondicoesExtraidas {
+  pdfText = normalizeExtractedPdfText(pdfText);
   const secaoPagamento = extrairSecaoPorTitulo(pdfText, 'CONDIÇÕES DE PAGAMENTO') ||
     extrairSecaoNumerada(pdfText, 5, 'CONDIÇÕES DE PAGAMENTO');
   if (secaoPagamento) {

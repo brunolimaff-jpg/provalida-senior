@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import ZAI from 'z-ai-web-dev-sdk';
+import { generateFallbackValidation } from '@/lib/gemini';
+import { hasZAIConfig } from '@/lib/zai-config';
+import type { ExtractedField } from '@/components/provalida/types';
 
 /**
  * API route que valida os campos extraídos de uma proposta comercial
@@ -7,15 +10,23 @@ import ZAI from 'z-ai-web-dev-sdk';
  */
 
 export async function POST(request: NextRequest) {
+  let campos: ExtractedField[] = [];
+  let pdfText = '';
+
   try {
     const body = await request.json();
-    const { campos, pdfText } = body as { campos: Array<{ campo: string; valor: string; encontrado: boolean; origem: string; trechoPDF?: string }>; pdfText: string };
-
-    if (!campos || !Array.isArray(campos)) {
+    if (!Array.isArray(body.campos)) {
       return NextResponse.json(
         { error: 'Campos não fornecidos ou formato inválido' },
         { status: 400 }
       );
+    }
+
+    campos = body.campos as ExtractedField[];
+    pdfText = body.pdfText || '';
+
+    if (!hasZAIConfig()) {
+      return NextResponse.json(generateFallbackValidation(campos, pdfText, !!pdfText));
     }
 
     const zai = await ZAI.create();
@@ -111,6 +122,12 @@ Erros penalizam mais que avisos.`;
 
     return NextResponse.json(result);
   } catch (error: unknown) {
+    if (Array.isArray(campos)) {
+      const message = error instanceof Error ? error.message : 'Erro desconhecido';
+      console.warn(`[ProValida] IA indisponível na validação; usando fallback local. Motivo: ${message}`);
+      return NextResponse.json(generateFallbackValidation(campos, pdfText, !!pdfText));
+    }
+
     console.error('Erro na validação:', error);
     const message = error instanceof Error ? error.message : 'Erro desconhecido';
     return NextResponse.json(

@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import ZAI from 'z-ai-web-dev-sdk';
+import { extractFieldsLocally } from '@/services/local-extraction';
+import { complementarComExtracaoLocal } from '@/services/field-complement';
+import { hasZAIConfig } from '@/lib/zai-config';
 
 /**
  * API route que extrai campos estruturados do texto de uma proposta comercial
@@ -15,15 +18,21 @@ import ZAI from 'z-ai-web-dev-sdk';
  */
 
 export async function POST(request: NextRequest) {
+  let pdfText = '';
+
   try {
     const body = await request.json();
-    const { pdfText, fileName } = body as { pdfText: string; fileName: string };
+    pdfText = (body as { pdfText?: string }).pdfText || '';
 
     if (!pdfText || pdfText.trim().length === 0) {
       return NextResponse.json(
         { error: 'Texto do PDF vazio ou não fornecido' },
         { status: 400 }
       );
+    }
+
+    if (!hasZAIConfig()) {
+      return NextResponse.json(extractFieldsLocally(pdfText));
     }
 
     const zai = await ZAI.create();
@@ -163,8 +172,14 @@ Retorne APENAS o JSON, sem texto adicional.`;
     const result = JSON.parse(cleanText);
     result.textoBruto = pdfText;
 
-    return NextResponse.json(result);
+    return NextResponse.json(complementarComExtracaoLocal(result, pdfText));
   } catch (error: unknown) {
+    if (pdfText && pdfText.trim().length > 0) {
+      const message = error instanceof Error ? error.message : 'Erro desconhecido';
+      console.warn(`[ProValida] IA indisponível na extração; usando fallback local. Motivo: ${message}`);
+      return NextResponse.json(extractFieldsLocally(pdfText));
+    }
+
     console.error('Erro na extração:', error);
     const message = error instanceof Error ? error.message : 'Erro desconhecido';
     return NextResponse.json(
