@@ -1,6 +1,3 @@
-import path from 'node:path';
-import { createRequire } from 'node:module';
-import { pathToFileURL } from 'node:url';
 import { NextRequest, NextResponse } from 'next/server';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 
@@ -16,18 +13,16 @@ interface TextItem {
   width: number;
 }
 
-// Resolve os arquivos do pdfjs-dist via package resolution em vez de
-// `process.cwd()` — em ambientes serverless (Vercel) o cwd é `/var/task`
-// e o caminho relativo nem sempre aponta para o bundle correto.
+// Resolve os arquivos do pdfjs-dist via import.meta.resolve em vez de
+// createRequire.resolve. No bundle serverless com Turbopack, createRequire
+// pode virar um ID numérico interno e quebrar chamadas de path.dirname().
 // A resolução é lazy para não falhar durante o collect-page-data do build.
 let standardFontDataUrlCache: string | null = null;
 
 function resolvePdfjsAssets(): { standardFontDataUrl: string } {
   if (standardFontDataUrlCache) return { standardFontDataUrl: standardFontDataUrlCache };
-  const requireFromHere = createRequire(import.meta.url);
-  const pdfjsPackageRoot = path.dirname(requireFromHere.resolve('pdfjs-dist/package.json'));
-  const standardFontsDir = path.join(pdfjsPackageRoot, 'standard_fonts');
-  standardFontDataUrlCache = pathToFileURL(standardFontsDir + path.sep).href;
+  const standardFontFileUrl = import.meta.resolve('pdfjs-dist/standard_fonts/FoxitSerif.pfb');
+  standardFontDataUrlCache = new URL('./', standardFontFileUrl).href;
   return { standardFontDataUrl: standardFontDataUrlCache };
 }
 
