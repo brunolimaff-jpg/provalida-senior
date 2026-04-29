@@ -1,7 +1,6 @@
-import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { NextRequest, NextResponse } from 'next/server';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { WorkerMessageHandler } from 'pdfjs-dist/legacy/build/pdf.worker.mjs';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -15,17 +14,13 @@ interface TextItem {
   width: number;
 }
 
-function getStandardFontDataUrl(): string {
-  const standardFontsPath = path.join(process.cwd(), 'node_modules/pdfjs-dist/standard_fonts') + path.sep;
-  return pathToFileURL(standardFontsPath).href;
-}
+function configurePdfWorker() {
+  const pdfGlobal = globalThis as typeof globalThis & {
+    pdfjsWorker?: { WorkerMessageHandler: typeof WorkerMessageHandler };
+  };
 
-function getWorkerSrc(): string {
-  const workerPath = path.join(process.cwd(), 'node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs');
-  return pathToFileURL(workerPath).href;
+  pdfGlobal.pdfjsWorker ??= { WorkerMessageHandler };
 }
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = getWorkerSrc();
 
 function appendPageText(items: unknown[]): string {
   const lineMap = new Map<string, TextItem[]>();
@@ -96,10 +91,11 @@ export async function POST(request: NextRequest) {
 
     const arrayBuffer = await file.arrayBuffer();
     const pdfBytes = new Uint8Array(arrayBuffer);
+    configurePdfWorker();
     const pdf = await pdfjsLib.getDocument({
       data: pdfBytes,
-      standardFontDataUrl: getStandardFontDataUrl(),
       verbosity: 0,
+      useSystemFonts: true,
     }).promise;
 
     let text = '';
