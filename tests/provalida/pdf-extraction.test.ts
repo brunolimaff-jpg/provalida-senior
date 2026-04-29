@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 import { extractFieldsLocally } from '../../src/services/local-extraction';
 import { extrairCondicoesDoPDF, extrairInvestimentoDoPDF, extrairSecaoNumerada, extrairSecaoPorTitulo } from '../../src/services/pdf-extraction';
+import { generateFallbackValidation } from '../../src/lib/gemini';
+import { POST as extractPost } from '../../src/app/api/extract/route';
+import { POST as validatePost } from '../../src/app/api/validate/route';
 
 const REAL_PDF_SNIPPET = `
 Proposta Comercial Senior PR372150V1MH
@@ -135,6 +138,98 @@ SaaS o valor que será cobrado nos primeiros 6 meses será de R$ 31.018,61
 após os 6 meses de carência o valor volta a ser cobrado integralmente
 de R$ 62.037,23.
 6. APROVAÇÃO
+`;
+
+const CLAUDIO_EXTRACTED_TEXT = `
+Proposta Comercial Senior PR397530V5AB
+2. ESCOPO DE SERVIÇOS CONTEMPLADOS
+- ID ESCOPO_SINTETICO_397530_PM_ERP_CLAUDIO AUTO PEÇAS_13042026
+3. INVESTIMENTO
+MENSALIDADE
+Modalidade de
+Solução
+venda
+Gestão Empresarial ERP
+SaaS
+Senior Flow
+Total (sem impostos) Total (com impostos)
+R $ 55.951,61 R$ 62.037,23
+HABILITAÇÃO e SERVIÇOS
+Solução Habilitação Serviços
+R $ 128.335,10 sem impostos R $ 461.012,94 sem impostos
+Gestão Empresarial ERP
+Senior Flow
+R$ 143.391,18 com impostos R $ 515.098,26 com impostos
+Total (sem impostos) Total (com impostos)
+R $ 589.348,04 R $ 658.489,44
+4. FATURA EXCEDENTE
+Recebimentos de NFSe 50 0 R$ 1,32
+Múltiplos Documentos 20 . 000 R$ 0,33
+CONNECT 100.000 Pacote de execuções excedentes / mês R$ 530,00
+5. CONDIÇÕES DE PAGAMENTO
+O pagamento da habilitação ocorrerá em 10 parcelas (boletos a cada 30
+HABILITAÇÃO
+dias).
+O vencimento será mensal, no dia 20 de cada mês, com o primeiro
+pagamento ocorrendo no mês posterior ao da assinatura da proposta
+MENSALIDADE e/ou contrato com 50% de carência nos primeiros 6 meses, sendo assim
+SaaS o valor que será cobrado nos primeiros 6 meses será de R$ 31. 018,61
+após os 6 meses de carência o valor volta a ser cobrado integralmente
+de R$ 6 2.037,23 .
+É o projeto em que, independentemente das horas trabalhadas pelo
+Consultor, o valor mencionado na proposta para execução dos serviços
+será o faturado . O faturamento será feito de forma POR PACOTE /
+EVOLUÇÃO (realizado de acordo com a finalização das FASES
+detalhadas) , com pagamento da(s) NF(s) ocorrendo em 01 parcela para
+30 dias.
+% Percentual
+FASES Mínimo de
+Faturamento
+01 – Aceite da proposta 10%
+SERVIÇOS
+02 - Realização do Kickoff 5%
+Escopo Fechado
+03 - Aprovação do planejamento/cronograma inicial
+5%
+(no 1º ciclo se existir)
+04 - Aprovação de DPS's Padrões ou documento
+10%
+equivalente (Documentos de Processo Senior)
+05 - Aprovação de CTS's ou documento equivalente
+10%
+(Cenário de Testes Senior)
+06 - Conclusão da fase de Planejamento 5%
+07 - Entrega para Homologação 10%
+08 - Aprovação da Homologação 15%
+09 - Aprovação do DOSP ou documento equivalente
+10%
+1 0 - Realização do GO LIVE 10%
+1 1 - Encerramento do projeto 10%
+As despesas serão pagas 14 dias após o RDV (Relatório de Despesas de
+DESPESAS DE VIAGEM
+Viagem).
+5.1 Faturamento:
+O faturamento dos valores previstos na presente Proposta Comercial poderá ser emitido pela SENIOR
+SISTEMAS S/A - CNPJ 80.680.093/0001 - 81
+6. DESPESAS DE DESLOCAMENTO
+QUILÔMETRO RODADO R$ 1,20
+7. TERMOS E CONDIÇÕES
+» Todos os valores contemplados nesta proposta contêm impostos;
+» Esta proposta tem prazo mínimo contratual de 36 meses;
+» As condições expressas nesta proposta são válidas por 60 dias;
+Código de identificação da proposta – PR397530V5AB
+Primavera do Leste , MT , ___/ ___/ ___
+Dados do cliente : CLAUDIO AUTO PECAS LTDA
+CEP: 78850 - 000
+CNPJ: 01.624.149/0001 - 04
+Dados para faturamento conforme tabela abaixo :
+☒ Mensalidade ☒ Habilitação ☒ Serviços
+CNPJ PERCENTUAL DE RATEIO (%)
+01.624.149/0001 - 04 100 %
+Senior Sistemas S/A
+CNPJ/MF: 80.680.093/0001 - 81
+Rua São Paulo, 825, Bairro Victor Konder
+Blumenau - SC / CEP: 89012 - 001
 `;
 
 describe('parser financeiro ProValida', () => {
@@ -272,5 +367,58 @@ describe('parser financeiro ProValida', () => {
     expect(condicoes.detalhes?.mensalidade.descontoPercentual).toBe('50%');
     expect(condicoes.detalhes?.mensalidade.valorComDesconto).toBe('R$ 31.018,61');
     expect(condicoes.condicaoMensalidade).toContain('6 primeiros meses com 50% de carência');
+  });
+
+  it('preenche corretamente a proposta Claudio apesar de espaços no texto extraído', () => {
+    const result = extractFieldsLocally(CLAUDIO_EXTRACTED_TEXT);
+    const descriptions = result.condicoesPagamento?.pacote?.etapas.flatMap(stage => stage.marcos.map(marco => marco.descricao)) || [];
+
+    expect(result.cliente).toBe('CLAUDIO AUTO PECAS LTDA');
+    expect(result.cnpj).toBe('01.624.149/0001-04');
+    expect(result.endereco).toBe('');
+    expect(result.investimentos[0].valorSemImposto).toBe('R$ 55.951,61');
+    expect(result.investimentos[0].valorComImposto).toBe('R$ 62.037,23');
+    expect(result.investimentos[1].valorSemImposto).toBe('R$ 589.348,04');
+    expect(result.investimentos[1].valorComImposto).toBe('R$ 658.489,44');
+    expect(result.condicoesPagamento?.mensalidade.parcelasComDesconto).toBe('6');
+    expect(result.condicoesPagamento?.mensalidade.descontoPercentual).toBe('50%');
+    expect(result.condicoesPagamento?.mensalidade.valorComDesconto).toBe('R$ 31.018,61');
+    expect(result.condicoesPagamento?.habilitacaoServicos.observacao).toContain('10 parcelas');
+    expect(result.financiamento).toBe('');
+    expect(result.faturamentoServicos).toBe('Por pacote');
+    expect(result.resumoAuditoria?.riscos).not.toContain('Habilitação + Serviços não encontrada no PDF');
+    expect(result.resumoAuditoria?.riscos).not.toContain('Condição de financiamento precisa de revisão');
+    expect(descriptions).not.toContain('e/ou contrato com');
+  });
+
+  it('não gera erro de financiamento quando a proposta é parcelada sem BTG', () => {
+    const result = extractFieldsLocally(CLAUDIO_EXTRACTED_TEXT);
+    const validation = generateFallbackValidation(result.campos, result.textoBruto, true);
+
+    expect(validation.itens.find(item => item.id === 'btg_pdf')).toBeUndefined();
+    expect(validation.itens.find(item => item.id === 'cnpj_pdf')?.status).not.toBe('error');
+  });
+
+  it('rotas de API usam fallback local quando IA não está configurada', async () => {
+    const extractResponse = await extractPost(new Request('http://localhost/api/extract', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pdfText: CLAUDIO_EXTRACTED_TEXT, fileName: 'claudio.pdf' }),
+    }) as never);
+    const extraction = await extractResponse.json();
+
+    expect(extractResponse.status).toBe(200);
+    expect(extraction.cliente).toBe('CLAUDIO AUTO PECAS LTDA');
+    expect(extraction.investimentos[1].valorComImposto).toBe('R$ 658.489,44');
+
+    const validateResponse = await validatePost(new Request('http://localhost/api/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ campos: extraction.campos, pdfText: CLAUDIO_EXTRACTED_TEXT }),
+    }) as never);
+    const validation = await validateResponse.json();
+
+    expect(validateResponse.status).toBe(200);
+    expect(validation.itens.find((item: { id: string }) => item.id === 'btg_pdf')).toBeUndefined();
   });
 });

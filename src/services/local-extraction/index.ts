@@ -8,7 +8,7 @@ import type {
   ProposalAuditSummary,
 } from '@/components/provalida/types';
 import { CCI_DEFAULT, calcularSemImposto, formatBRL } from '@/services/financial-parsing';
-import { extrairCondicoesDoPDF, extrairInvestimentoDoPDF } from '@/services/pdf-extraction';
+import { extrairCondicoesDoPDF, extrairInvestimentoDoPDF, normalizeExtractedPdfText } from '@/services/pdf-extraction';
 
 function findPattern(text: string, patterns: RegExp[]): string {
   for (const pattern of patterns) {
@@ -92,14 +92,16 @@ function findEndereco(pdfText: string, clienteCnpj: string): { endereco: string;
   const cnpjIndex = clienteCnpj ? pdfText.indexOf(clienteCnpj) : -1;
   if (cnpjIndex < 0) return { endereco: '', evidencia: '' };
   const nearby = pdfText.slice(cnpjIndex, Math.min(pdfText.length, cnpjIndex + 700));
-  const lines = nearby.split('\n').map(line => line.trim()).filter(Boolean);
+  const clientOnlyNearby = nearby.split(/Senior Sistemas S\/A|CNPJ\/MF:\s*80\./i)[0];
+  const lines = clientOnlyNearby.split('\n').map(line => line.trim()).filter(Boolean);
   const candidate = lines.find(line =>
     /(?:Rua|Avenida|Av\.|Rod\.?|Rodovia|Estrada|Km|S\/N|CEP|MT|SP|SC|PR|GO|MS|RS)\b/i.test(line) &&
+    !/^CEP[:\s\d.-]+$/i.test(line) &&
     !/https?:\/\//i.test(line) &&
     !/senior|cnpj/i.test(line)
   );
 
-  return { endereco: candidate || '', evidencia: nearby };
+  return { endereco: candidate || '', evidencia: clientOnlyNearby };
 }
 
 function findExecutivo(pdfText: string): { nome: string; email: string; cargo: string; evidencia: string } {
@@ -232,11 +234,14 @@ function buildResumoAuditoria(result: ExtractionResult): ProposalAuditSummary {
   const riscos: string[] = [];
   const mensalidade = result.investimentos.find(item => item.descricao === 'Mensalidade');
   const habilitacao = result.investimentos.find(item => item.descricao === 'Habilitação + Serviços');
+  const habilitacaoPagamento = result.condicoesPagamento?.habilitacaoServicos;
 
   if (!mensalidade?.valorComImposto || mensalidade.valorComImposto === '—') riscos.push('Mensalidade não encontrada no PDF');
   if (!habilitacao?.valorComImposto || habilitacao.valorComImposto === '—') riscos.push('Habilitação + Serviços não encontrada no PDF');
   if (!result.condicoesPagamento?.mensalidade.valorComDesconto) riscos.push('Desconto/carência de mensalidade precisa de revisão');
-  if (!result.financiamento) riscos.push('Condição de financiamento precisa de revisão');
+  if (!result.financiamento && !habilitacaoPagamento?.observacao && !habilitacaoPagamento?.formaPagamento) {
+    riscos.push('Condição de pagamento de habilitação/serviços precisa de revisão');
+  }
 
   return {
     cliente: result.cliente,
@@ -251,6 +256,7 @@ function buildResumoAuditoria(result: ExtractionResult): ProposalAuditSummary {
 }
 
 export function extractFieldsLocally(pdfText: string): ExtractionResult {
+  pdfText = normalizeExtractedPdfText(pdfText);
   const lower = pdfText.toLowerCase();
   const investimento = extrairInvestimentoDoPDF(pdfText);
   const condicoes = extrairCondicoesDoPDF(pdfText);
