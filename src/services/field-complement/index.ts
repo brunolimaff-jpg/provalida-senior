@@ -239,8 +239,24 @@ export function complementarComExtracaoLocal(result: ExtractionResult, pdfText: 
   result.faturamentoServicos = local.faturamentoServicos || result.faturamentoServicos;
   result.evidencias = { ...(result.evidencias || {}), ...(local.evidencias || {}) };
   result.resumoAuditoria = local.resumoAuditoria;
-  result.campos = local.campos;
+  result.campos = mergeCampos(result.campos, local.campos);
   return result;
+}
+
+// Mescla campos preservando valores já encontrados pela IA quando o parser
+// local não conseguiu identificar — evita perder o campo "Solução" e demais
+// campos populados via /api/extract.
+function mergeCampos(
+  apiCampos: ExtractionResult['campos'] | undefined,
+  localCampos: ExtractionResult['campos']
+): ExtractionResult['campos'] {
+  if (!apiCampos || apiCampos.length === 0) return localCampos;
+  const apiByName = new Map(apiCampos.map(campo => [campo.campo, campo]));
+  return localCampos.map(localCampo => {
+    if (localCampo.encontrado) return localCampo;
+    const fromApi = apiByName.get(localCampo.campo);
+    return fromApi && fromApi.encontrado ? fromApi : localCampo;
+  });
 }
 
 // ============================================================

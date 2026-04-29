@@ -137,7 +137,7 @@ function buildRateio(pdfText: string): ExtractedRateio[] {
   const rateios: ExtractedRateio[] = [];
 
   for (const linha of linhas) {
-    const match = linha.match(/(.+?)\s+(Licen[cç]as|Servi[çc]os)\s+(\d{1,3}(?:[.,]\d{1,2})?)%/i);
+    const match = linha.match(/(.+?)\s+(Licen[cç]as|Servi[çc]os)\s+(\d{1,3}(?:[.,]\d{1,2})?)\s*%/i);
     if (!match) continue;
     rateios.push({
       conta: match[1].trim(),
@@ -199,7 +199,12 @@ function buildFlatFields(result: ExtractionResult): ExtractedField[] {
     buildField('Escopo', escopo, result.escopos.map(item => item.id).join(', '), escopo ? 'inferido' : 'nao_encontrado'),
     buildField('Faturamento de Serviços', result.faturamentoServicos || '', result.faturamentoServicos || '', (result.faturamentoServicos || '') ? 'pdf' : 'nao_encontrado'),
     buildField('Tipo Alíquota', '', '', 'nao_encontrado'),
-    buildField('Imposto CCI (%)', result.impostoCCI ? result.impostoCCI.toFixed(2).replace('.', ',') : '', result.impostoCCI ? `${result.impostoCCI}%` : '', result.impostoCCI ? 'inferido' : 'nao_encontrado'),
+    buildField(
+      'Imposto CCI (%)',
+      result.impostoCCI != null ? result.impostoCCI.toFixed(2).replace('.', ',') : '',
+      result.impostoCCI != null ? `${result.impostoCCI}%` : '',
+      result.impostoCCI != null ? 'inferido' : 'nao_encontrado'
+    ),
     buildField('Impostos', result.camposAusentes.impostos, result.camposAusentes.impostos, result.camposAusentes.impostos ? 'inferido' : 'nao_encontrado'),
     buildField('Responsável pelo Suporte', '', '', 'nao_encontrado'),
     buildField('Possui Rateio', result.rateio.length > 0 ? 'Sim' : '', result.rateio.length > 0 ? 'Rateio identificado no PDF' : '', result.rateio.length > 0 ? 'inferido' : 'nao_encontrado'),
@@ -207,7 +212,12 @@ function buildFlatFields(result: ExtractionResult): ExtractedField[] {
     buildField('CNPJ', result.cnpj, result.cnpj, 'pdf'),
     buildField('Endereço', result.endereco, result.endereco, 'pdf'),
     buildField('Executivo', result.executivo, result.executivo, 'pdf'),
-    buildField('Solução', result.modulos.length > 0 ? result.modulos.map(item => item.bloco).filter((value, index, list) => list.indexOf(value) === index).join(' / ') : '', '', result.modulos.length > 0 ? 'inferido' : 'nao_encontrado'),
+    (() => {
+      const solucao = result.modulos.length > 0
+        ? result.modulos.map(item => item.bloco).filter((value, index, list) => list.indexOf(value) === index).join(' / ')
+        : '';
+      return buildField('Solução', solucao, solucao, solucao ? 'inferido' : 'nao_encontrado');
+    })(),
     buildField('Valor Mensalidade', mensalidade?.valorComImposto || '', mensalidade?.valorComImposto || '', mensalidade?.valorComImposto ? 'pdf' : 'nao_encontrado'),
     buildField('Valor Habilitação + Serviços', habilitacao?.valorComImposto || '', habilitacao?.valorComImposto || '', habilitacao?.valorComImposto ? 'pdf' : 'nao_encontrado'),
     buildField('Prazo Contratual', result.prazoContratual, result.prazoContratual, result.prazoContratual ? 'pdf' : 'nao_encontrado'),

@@ -6,6 +6,8 @@ import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+const MAX_PDF_SIZE_BYTES = 25 * 1024 * 1024;
+
 interface TextItem {
   str: string;
   x: number;
@@ -22,6 +24,8 @@ function getWorkerSrc(): string {
   const workerPath = path.join(process.cwd(), 'node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs');
   return pathToFileURL(workerPath).href;
 }
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = getWorkerSrc();
 
 function appendPageText(items: unknown[]): string {
   const lineMap = new Map<string, TextItem[]>();
@@ -61,6 +65,17 @@ function appendPageText(items: unknown[]): string {
 
 export async function POST(request: NextRequest) {
   try {
+    const contentLengthHeader = request.headers.get('content-length');
+    if (contentLengthHeader) {
+      const contentLength = Number.parseInt(contentLengthHeader, 10);
+      if (Number.isFinite(contentLength) && contentLength > MAX_PDF_SIZE_BYTES) {
+        return NextResponse.json(
+          { error: `PDF excede o tamanho máximo de ${Math.round(MAX_PDF_SIZE_BYTES / (1024 * 1024))} MB.` },
+          { status: 413 }
+        );
+      }
+    }
+
     const formData = await request.formData();
     const file = formData.get('file');
 
@@ -72,9 +87,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Formato não suportado. Envie um PDF.' }, { status: 400 });
     }
 
+    if (file.size > MAX_PDF_SIZE_BYTES) {
+      return NextResponse.json(
+        { error: `PDF excede o tamanho máximo de ${Math.round(MAX_PDF_SIZE_BYTES / (1024 * 1024))} MB.` },
+        { status: 413 }
+      );
+    }
+
     const arrayBuffer = await file.arrayBuffer();
     const pdfBytes = new Uint8Array(arrayBuffer);
-    pdfjsLib.GlobalWorkerOptions.workerSrc = getWorkerSrc();
     const pdf = await pdfjsLib.getDocument({
       data: pdfBytes,
       standardFontDataUrl: getStandardFontDataUrl(),

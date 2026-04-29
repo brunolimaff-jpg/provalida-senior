@@ -8,6 +8,11 @@
 import type { ParsedEvidence, ParsedInvestment, ParsedPaymentTerms } from '@/components/provalida/types';
 import { parseBRL, BRL_CURRENCY_REGEX, BRL_VALUE_NO_PREFIX_REGEX } from '@/services/financial-parsing';
 
+// Valor mínimo (R$) para um item ser considerado um candidato a investimento
+// no fallback por maior valor — descarta ruídos como KM rodado, taxas mínimas,
+// fatura excedente, etc.
+const MIN_INVESTIMENTO_FALLBACK_BRL = 100;
+
 // ============================================================
 // Tipos de retorno
 // ============================================================
@@ -626,7 +631,7 @@ export function extrairInvestimentoDoPDF(pdfText: string): InvestimentoExtraido 
   // ============================================================
   if (!mensalidadeNum || !habilitacaoNum) {
     const valores = extrairValoresMonetarios(textoBusca)
-      .filter(item => item.valor > 100 && !/fatura excedente|km rodado|excedente/i.test(item.linha));
+      .filter(item => item.valor > MIN_INVESTIMENTO_FALLBACK_BRL && !/fatura excedente|km rodado|excedente/i.test(item.linha));
     if (valores.length >= 2) {
       const ordenados = [...valores].sort((a, b) => a.valor - b.valor);
       if (!mensalidadeNum && !ordenados[0].linha.toLowerCase().includes('desconto')) {
