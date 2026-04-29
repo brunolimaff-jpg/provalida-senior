@@ -30,8 +30,19 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+!.env.example
+
+# local database files
+prisma/db/*.db
+prisma/db/*.db-journal
+prisma/db/*.sqlite
+prisma/db/*.sqlite3
 
 # vercel
 .vercel
@@ -41,6 +52,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 local-*
+!src/services/local-extraction/
+!src/services/local-extraction/index.ts
 .claude
 .z-ai-config
 *.log

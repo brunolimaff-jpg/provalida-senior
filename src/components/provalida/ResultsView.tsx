@@ -1,7 +1,8 @@
 'use client';
 
-import { Building2, User, Package, FileSearch, DollarSign, CreditCard, AlertTriangle, ChevronRight, Shield } from 'lucide-react';
+import { AlertTriangle, Building2, CalendarClock, CheckCircle2, ChevronRight, CreditCard, DollarSign, FileSearch, Landmark, Package, User } from 'lucide-react';
 import type { ExtractionResult, ValidationItem, ValidationResult, ModuloItem, EscopoItem, InvestimentoItem, CondicaoPagamento, CamposAusentes } from './types';
+import { formatBRL, parseBRL } from '@/services/financial-parsing';
 import ScoreCard from './ScoreCard';
 import FilterChips from './FilterChips';
 import ValidationList from './ValidationList';
@@ -18,6 +19,86 @@ interface ResultsViewProps {
   onExportCSV: () => void;
   onReset: () => void;
   numeroProposta: string;
+}
+
+function SourceChip({ label = 'PDF', tone = 'ok' }: { label?: string; tone?: 'ok' | 'warn' | 'neutral' }) {
+  const toneClass = tone === 'ok'
+    ? 'bg-[#d4dfcc] text-[#437a22]'
+    : tone === 'warn'
+      ? 'bg-[#ddcfc6] text-[#964219]'
+      : 'bg-[var(--background)] text-[var(--muted-foreground)]';
+
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${toneClass}`}>
+      {tone === 'ok' ? <CheckCircle2 className="h-3 w-3" /> : tone === 'warn' ? <AlertTriangle className="h-3 w-3" /> : null}
+      {label}
+    </span>
+  );
+}
+
+function EvidenceLine({ text }: { text?: string }) {
+  if (!text) return null;
+  return (
+    <p className="mt-2 rounded-md border border-[var(--border)] bg-white px-3 py-2 text-[11px] leading-relaxed text-[var(--muted-foreground)]">
+      {text}
+    </p>
+  );
+}
+
+function hasDisplayValue(value?: string): boolean {
+  if (!value) return false;
+  const normalized = value.trim().toLowerCase();
+  return normalized !== '' && normalized !== '—' && normalized !== 'não encontrado' && normalized !== 'não encontrado no pdf';
+}
+
+function AuditHero({ extraction, resultado }: { extraction: ExtractionResult; resultado: ValidationResult }) {
+  const risks = extraction.resumoAuditoria?.riscos || [];
+  const errorCount = resultado.itens.filter(item => item.status === 'error').length;
+  const warnCount = resultado.itens.filter(item => item.status === 'warning').length;
+  const statusOk = risks.length === 0 && errorCount === 0;
+
+  return (
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm overflow-hidden">
+      <div className="grid grid-cols-1 gap-4 p-5 lg:grid-cols-[1fr_auto]">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <SourceChip label={statusOk ? 'Confirmado' : 'Revisar'} tone={statusOk ? 'ok' : 'warn'} />
+            <span className="text-xs font-semibold text-[var(--muted-foreground)]">{extraction.codigoProposta || 'Código não encontrado'}</span>
+          </div>
+          <h1 className="mt-2 text-xl font-bold text-[var(--text)] sm:text-2xl">{extraction.cliente || 'Cliente não encontrado no PDF'}</h1>
+          <p className="mt-1 text-sm text-[var(--muted-foreground)]">{extraction.cnpj || 'CNPJ não encontrado'}{extraction.endereco ? ` · ${extraction.endereco}` : ''}</p>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 sm:min-w-[320px]">
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3 text-center">
+            <p className="text-[10px] font-semibold uppercase text-[var(--muted-foreground)]">Score</p>
+            <p className="text-xl font-bold text-[#01696f]">{resultado.score}</p>
+          </div>
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3 text-center">
+            <p className="text-[10px] font-semibold uppercase text-[var(--muted-foreground)]">Críticos</p>
+            <p className="text-xl font-bold text-[#a12c7b]">{errorCount}</p>
+          </div>
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3 text-center">
+            <p className="text-[10px] font-semibold uppercase text-[var(--muted-foreground)]">Avisos</p>
+            <p className="text-xl font-bold text-[#964219]">{warnCount}</p>
+          </div>
+        </div>
+      </div>
+
+      {risks.length > 0 && (
+        <div className="border-t border-[#964219]/20 bg-[#ddcfc6]/20 px-5 py-3">
+          <div className="flex flex-wrap gap-2">
+            {risks.map(risk => (
+              <span key={risk} className="inline-flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1 text-xs font-medium text-[#964219]">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                {risk}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ============================================================
@@ -44,7 +125,7 @@ function GeneralInfoSection({ extraction }: { extraction: ExtractionResult }) {
         {/* Endereço */}
         {extraction.endereco && (
           <div className="flex items-start gap-2">
-            <span className="text-[10px] font-semibold text-[var(--muted)] uppercase tracking-wider mt-0.5 w-20 shrink-0">Endereço</span>
+            <span className="text-[10px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mt-0.5 w-20 shrink-0">Endereço</span>
             <span className="text-sm text-[var(--text)]">{extraction.endereco}</span>
           </div>
         )}
@@ -53,41 +134,36 @@ function GeneralInfoSection({ extraction }: { extraction: ExtractionResult }) {
         <div className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3">
           <div className="flex items-center gap-2 mb-2">
             <User className="h-4 w-4 text-[#01696f]" />
-            <span className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wider">Executivo</span>
+            <span className="text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">Executivo</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <div>
-              <p className="text-[10px] text-[var(--muted)]">Nome</p>
+              <p className="text-[10px] text-[var(--muted-foreground)]">Nome</p>
               <p className="text-sm font-medium text-[var(--text)]">{extraction.executivo}</p>
             </div>
             {extraction.cargoExecutivo && (
               <div>
-                <p className="text-[10px] text-[var(--muted)]">Cargo</p>
+                <p className="text-[10px] text-[var(--muted-foreground)]">Cargo</p>
                 <p className="text-sm text-[var(--text)]">{extraction.cargoExecutivo}</p>
               </div>
             )}
             {extraction.emailExecutivo && (
               <div>
-                <p className="text-[10px] text-[var(--muted)]">E-mail</p>
+                <p className="text-[10px] text-[var(--muted-foreground)]">E-mail</p>
                 <p className="text-sm text-[#01696f] break-all">{extraction.emailExecutivo}</p>
               </div>
             )}
           </div>
         </div>
 
-        {/* Proposta */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div>
-            <p className="text-[10px] text-[var(--muted)] uppercase tracking-wider">Proposta</p>
-            <p className="text-sm font-semibold text-[var(--text)]">{extraction.numeroProposta || '—'}</p>
-          </div>
-          <div>
-            <p className="text-[10px] text-[var(--muted)] uppercase tracking-wider">Código</p>
+            <p className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider">Código</p>
             <p className="text-sm font-semibold text-[#01696f]">{extraction.codigoProposta || '—'}</p>
           </div>
           {extraction.versaoModelo && (
             <div className="col-span-2">
-              <p className="text-[10px] text-[var(--muted)] uppercase tracking-wider">Versão do Modelo</p>
+              <p className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider">Versão do Modelo</p>
               <p className="text-sm text-[var(--text)]">{extraction.versaoModelo}</p>
             </div>
           )}
@@ -117,7 +193,7 @@ function ModulesSection({ modulos }: { modulos: ModuloItem[] }) {
       <div className="flex items-center gap-2 px-5 py-3 border-b border-[var(--border)] bg-[var(--background)]">
         <Package className="h-4 w-4 text-[#01696f]" />
         <h3 className="text-sm font-bold text-[var(--text)]">1.1 MÓDULOS</h3>
-        <span className="ml-auto text-[10px] text-[var(--muted)]">{modulos.length} módulos</span>
+        <span className="ml-auto text-[10px] text-[var(--muted-foreground)]">{modulos.length} módulos</span>
       </div>
 
       {/* Blocos */}
@@ -134,9 +210,9 @@ function ModulesSection({ modulos }: { modulos: ModuloItem[] }) {
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-[var(--border)] bg-[var(--background)]">
-                    <th className="py-2 px-4 text-left font-semibold text-[var(--muted)] uppercase tracking-wider">Módulo</th>
-                    <th className="py-2 px-4 text-right font-semibold text-[var(--muted)] uppercase tracking-wider">Qtd</th>
-                    <th className="py-2 px-4 text-left font-semibold text-[var(--muted)] uppercase tracking-wider">Modalidade</th>
+                    <th className="py-2 px-4 text-left font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">Módulo</th>
+                    <th className="py-2 px-4 text-right font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">Qtd</th>
+                    <th className="py-2 px-4 text-left font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">Modalidade</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -144,7 +220,7 @@ function ModulesSection({ modulos }: { modulos: ModuloItem[] }) {
                     <tr key={i} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--background)]">
                       <td className="py-2.5 px-4 text-[var(--text)] font-medium">{mod.modulo}</td>
                       <td className="py-2.5 px-4 text-right font-semibold text-[#01696f]">{mod.quantidade}</td>
-                      <td className="py-2.5 px-4 text-[var(--muted)]">{mod.unidade}</td>
+                      <td className="py-2.5 px-4 text-[var(--muted-foreground)]">{mod.unidade}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -189,99 +265,54 @@ function ScopeSection({ escopos }: { escopos: EscopoItem[] }) {
 // ============================================================
 function InvestmentSection({ investimentos, impostoCCI, impostosInclusos }: { investimentos: InvestimentoItem[]; impostoCCI: number; impostosInclusos: boolean }) {
   if (!investimentos || investimentos.length === 0) return null;
-
-  const impostoConfirmado = impostoCCI === 10.50 || impostoCCI === 10.5;
-
-  // Validar se a diferença entre com e sem imposto é ~10.50%
-  const parseBRL = (s: string): number | null => {
-    const clean = s.replace(/[R$\s]/g, '').replace(/\./g, '').replace(',', '.');
-    const n = parseFloat(clean);
-    return isNaN(n) ? null : n;
-  };
-
-  const validacoes = investimentos.map(item => {
-    const com = parseBRL(item.valorComImposto);
-    const sem = parseBRL(item.valorSemImposto);
-    if (com && sem && sem > 0) {
-      const diferenca = ((com - sem) / sem) * 100;
-      const ok = Math.abs(diferenca - impostoCCI) < 1.0;
-      return { ok, diferenca: diferenca.toFixed(2) };
-    }
-    return { ok: true, diferenca: '—' };
-  });
-
-  const todasValidacoesOk = validacoes.every(v => v.ok);
+  const mensalidade = investimentos.find(item => item.descricao === 'Mensalidade');
+  const habilitacao = investimentos.find(item => item.descricao === 'Habilitação + Serviços');
+  const totalGlobal = [mensalidade?.valorComImposto, habilitacao?.valorComImposto]
+    .map(value => parseBRL(value || ''))
+    .filter((value): value is number => value !== null)
+    .reduce((sum, value) => sum + value, 0);
 
   return (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center gap-2 px-5 py-3 border-b border-[var(--border)] bg-[var(--background)]">
+    <div className="rounded-xl border border-[var(--border)] bg-white shadow-sm overflow-hidden">
+      <div className="flex items-center gap-2 px-5 py-3 border-b border-[var(--border)] bg-white">
         <DollarSign className="h-4 w-4 text-[#01696f]" />
-        <h3 className="text-sm font-bold text-[var(--text)]">3. INVESTIMENTO</h3>
-
-        {/* Badges */}
-        <div className="ml-auto flex items-center gap-1.5">
-          {impostoConfirmado ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-[#d4dfcc] px-2.5 py-0.5 text-[10px] font-semibold text-[#437a22]">
-              <Shield className="h-3 w-3" /> CCI {impostoCCI}% confirmado
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 rounded-full bg-[#ddcfc6] px-2.5 py-0.5 text-[10px] font-semibold text-[#964219]">
-              <AlertTriangle className="h-3 w-3" /> CCI {impostoCCI}% — verificar
-            </span>
-          )}
-          {todasValidacoesOk ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-[#d4dfcc] px-2.5 py-0.5 text-[10px] font-semibold text-[#437a22]">
-              <Shield className="h-3 w-3" /> Diferença validada
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 rounded-full bg-[#e0ced7] px-2.5 py-0.5 text-[10px] font-semibold text-[#a12c7b]">
-              <AlertTriangle className="h-3 w-3" /> Diferença inconsistente
-            </span>
-          )}
+        <h3 className="text-sm font-bold text-[var(--text)]">Valores Contratuais</h3>
+        <div className="ml-auto hidden items-center gap-1.5 sm:flex">
+          <SourceChip label={impostosInclusos ? 'Impostos inclusos' : 'Impostos a revisar'} tone={impostosInclusos ? 'ok' : 'warn'} />
+          <SourceChip label={`CCI ${impostoCCI}%`} tone="neutral" />
         </div>
       </div>
 
-      {/* Info sobre impostos */}
-      <div className="px-5 py-2.5 border-b border-[var(--border)] bg-[#cedcd8]/20">
-        <p className="text-[10px] text-[var(--text)]">
-          {impostosInclusos
-            ? `Valores JÁ INCLUEM ${impostoCCI}% de imposto CCI. O valor "sem imposto" é o BASE (mais confiável), e o valor "com imposto" = sem imposto × ${(1 + impostoCCI / 100).toFixed(3)}. A diferença entre eles deve ser de ~${impostoCCI}%.`
-            : `Valores NÃO INCLUEM ${impostoCCI}% de imposto CCI. O valor "com imposto" = sem imposto × ${(1 + impostoCCI / 100).toFixed(3)}. A diferença deve ser de ~${impostoCCI}%.`
-          }
-        </p>
-      </div>
-
-      {/* Tabela de valores */}
-      <div className="p-4">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b-2 border-[var(--border)]">
-                <th className="pb-3 text-left text-[10px] font-semibold text-[var(--muted)] uppercase tracking-wider">Item</th>
-                <th className="pb-3 text-right text-[10px] font-semibold text-[#437a22] uppercase tracking-wider">Com Imposto</th>
-                <th className="pb-3 text-right text-[10px] font-semibold text-[#964219] uppercase tracking-wider">Sem Imposto</th>
-                <th className="pb-3 text-right text-[10px] font-semibold text-[var(--muted)] uppercase tracking-wider">Diferença</th>
-              </tr>
-            </thead>
-            <tbody>
-              {investimentos.map((item, i) => (
-                <tr key={i} className="border-b border-[var(--border)] last:border-0">
-                  <td className="py-3 text-sm font-medium text-[var(--text)]">{item.descricao}</td>
-                  <td className="py-3 text-right text-sm font-bold text-[#437a22]">{item.valorComImposto}</td>
-                  <td className="py-3 text-right text-sm font-semibold text-[#964219]">{item.valorSemImposto}</td>
-                  <td className="py-3 text-right text-xs">
-                    {validacoes[i]?.ok ? (
-                      <span className="text-[#437a22] font-medium">{validacoes[i].diferenca}%</span>
-                    ) : (
-                      <span className="text-[#a12c7b] font-semibold">{validacoes[i].diferenca}% ⚠</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {totalGlobal > 0 && (
+        <div className="border-b border-[var(--border)] bg-white px-5 py-4">
+          <p className="text-xs font-bold uppercase text-[#01696f]">Valor global</p>
+          <p className="mt-1 text-3xl font-bold leading-tight text-[var(--text)] sm:text-4xl">{formatBRL(totalGlobal)}</p>
+          <p className="mt-1 text-xs text-[var(--muted-foreground)]">Soma de 1 mensalidade cheia + habilitação e serviços.</p>
         </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-3 p-4 md:grid-cols-2">
+        {investimentos.map((item) => (
+          <div key={item.descricao} className="rounded-lg border border-[var(--border)] bg-white p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase text-[#01696f]">{item.descricao}</p>
+                <p className="mt-2 text-3xl font-bold leading-tight text-[var(--text)] sm:text-4xl">{item.valorComImposto || 'Não encontrado no PDF'}</p>
+              </div>
+              <SourceChip label={item.confianca === 'alta' ? 'PDF' : 'Revisar'} tone={item.confianca === 'alta' ? 'ok' : 'warn'} />
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="rounded-md border border-[var(--border)] bg-white p-2">
+                <p className="text-[10px] font-semibold uppercase text-[var(--muted-foreground)]">Sem impostos</p>
+                <p className="text-sm font-semibold text-[#964219]">{item.valorSemImposto || 'Não encontrado'}</p>
+              </div>
+              <div className="rounded-md border border-[var(--border)] bg-white p-2">
+                <p className="text-[10px] font-semibold uppercase text-[var(--muted-foreground)]">Estado</p>
+                <p className="text-sm font-semibold text-[#437a22]">{item.confianca === 'alta' ? 'Confirmado' : 'Revisar'}</p>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -290,94 +321,212 @@ function InvestmentSection({ investimentos, impostoCCI, impostosInclusos }: { in
 // ============================================================
 // Seção: 5. CONDIÇÕES DE PAGAMENTO
 // ============================================================
-function PaymentSection({ condicoes, prazoContratual, validadeProposta, multaRescisoria, faturamentoServicos, financiamento }: {
+function PaymentSection({ condicoes, condicoesPagamento, prazoContratual, validadeProposta, multaRescisoria, faturamentoServicos, financiamento }: {
   condicoes: CondicaoPagamento[];
+  condicoesPagamento?: ExtractionResult['condicoesPagamento'];
   prazoContratual: string;
   validadeProposta: string;
   multaRescisoria: string;
   faturamentoServicos?: string;
   financiamento?: string;
 }) {
+  const mensalidade = condicoesPagamento?.mensalidade;
+  const habilitacao = condicoesPagamento?.habilitacaoServicos;
+  const oldHabilitacao = condicoes.find(cond => cond.tipo === 'Habilitação + Serviços')?.condicao;
+  const hasDiscount = hasDisplayValue(mensalidade?.parcelasComDesconto) &&
+    hasDisplayValue(mensalidade?.descontoPercentual) &&
+    hasDisplayValue(mensalidade?.valorComDesconto);
+  const hasScale = !!mensalidade?.escala && mensalidade.escala.length > 0;
+  const hasFinanciamento = hasDisplayValue(financiamento);
+  const hasHabilitacaoBanco = hasDisplayValue(habilitacao?.banco);
+  const hasHabilitacaoPrazo = hasDisplayValue(habilitacao?.prazoAprovacao);
+  const hasHabilitacao = hasDisplayValue(habilitacao?.formaPagamento) ||
+    hasHabilitacaoBanco ||
+    hasHabilitacaoPrazo ||
+    !!habilitacao?.cancelamentoAutomatico ||
+    hasDisplayValue(habilitacao?.observacao) ||
+    hasDisplayValue(oldHabilitacao);
+  const faturamentoValue = faturamentoServicos || condicoesPagamento?.faturamento?.valor || '';
+  const discountDescription = hasDiscount
+    ? `${mensalidade?.descontoPercentual} durante ${mensalidade?.parcelasComDesconto} meses`
+    : '';
+
   return (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center gap-2 px-5 py-3 border-b border-[var(--border)] bg-[var(--background)]">
+    <div className="rounded-xl border border-[var(--border)] bg-white shadow-sm overflow-hidden">
+      <div className="flex items-center gap-2 px-5 py-3 border-b border-[var(--border)] bg-white">
         <CreditCard className="h-4 w-4 text-[#01696f]" />
-        <h3 className="text-sm font-bold text-[var(--text)]">5. CONDIÇÕES DE PAGAMENTO</h3>
+        <h3 className="text-sm font-bold text-[var(--text)]">Condições de Pagamento</h3>
       </div>
 
-      <div className="p-4 space-y-4">
-        {/* Condições por tipo */}
-        {condicoes.map((cond, i) => (
-          <div key={i} className="rounded-lg border border-[var(--border)] overflow-hidden">
-            {/* Tipo header */}
-            <div className="bg-[#cedcd8]/30 px-4 py-2 border-b border-[var(--border)]">
-              <p className="text-xs font-bold text-[#01696f]">{cond.tipo}</p>
+      <div className="p-4 space-y-3">
+        <div className="rounded-lg border border-[var(--border)] bg-white p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <CalendarClock className="h-4 w-4 text-[#01696f]" />
+                <p className="text-xs font-bold uppercase text-[#01696f]">Mensalidade</p>
+              </div>
+              <SourceChip label={mensalidade?.evidenciaCampo ? 'PDF' : 'Revisar'} tone={mensalidade?.evidenciaCampo ? 'ok' : 'warn'} />
             </div>
-
-            <div className="p-4 space-y-3">
-              {/* Condição principal */}
-              {cond.condicao && (
-                <div>
-                  <p className="text-[10px] text-[var(--muted)] uppercase tracking-wider mb-1">Condição</p>
-                  {cond.condicao.split('\n').map((line, j) => (
-                    <p key={j} className="text-sm text-[var(--text)]">{line}</p>
-                  ))}
-                </div>
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div className="rounded-md border border-[var(--border)] bg-white p-2">
+                <p className="text-[10px] font-semibold uppercase text-[var(--muted-foreground)]">Vencimento</p>
+                <p className="text-sm font-semibold text-[var(--text)]">{mensalidade?.vencimento || 'Não encontrado no PDF'}</p>
+              </div>
+              {hasDiscount && (
+                <>
+                  <div className="rounded-md border border-[var(--border)] bg-white p-2">
+                    <p className="text-[10px] font-semibold uppercase text-[var(--muted-foreground)]">Carência</p>
+                    <p className="text-sm font-semibold text-[var(--text)]">{discountDescription}</p>
+                  </div>
+                  <div className="rounded-md border border-[var(--border)] bg-white p-2">
+                    <p className="text-[10px] font-semibold uppercase text-[var(--muted-foreground)]">Valor no período</p>
+                    <p className="text-sm font-semibold text-[#964219]">{mensalidade?.valorComDesconto}</p>
+                  </div>
+                </>
               )}
-
-              {/* Descontos */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-md bg-[var(--background)] border border-[var(--border)] p-2.5">
-                  <p className="text-[10px] text-[var(--muted)] uppercase tracking-wider">Desc. Habilitação</p>
-                  <p className="text-sm font-medium text-[var(--text)] mt-0.5">
-                    {cond.descontoHabilitacao || 'Não informado'}
-                  </p>
-                </div>
-                <div className="rounded-md bg-[var(--background)] border border-[var(--border)] p-2.5">
-                  <p className="text-[10px] text-[var(--muted)] uppercase tracking-wider">Desc. Serviços</p>
-                  <p className="text-sm font-medium text-[var(--text)] mt-0.5">
-                    {cond.descontoServicos || 'Não informado'}
-                  </p>
-                </div>
+              <div className="rounded-md border border-[var(--border)] bg-white p-2">
+                <p className="text-[10px] font-semibold uppercase text-[var(--muted-foreground)]">Valor cheio</p>
+                <p className="text-sm font-semibold text-[#437a22]">{mensalidade?.valorCheio || 'Não encontrado'}</p>
               </div>
             </div>
-          </div>
-        ))}
+        </div>
 
-        {/* Informações adicionais */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {prazoContratual && (
-            <div className="rounded-md bg-[var(--background)] border border-[var(--border)] p-2.5">
-              <p className="text-[10px] text-[var(--muted)] uppercase tracking-wider">Prazo Contratual</p>
-              <p className="text-sm font-semibold text-[var(--text)] mt-0.5">{prazoContratual}</p>
+        {hasHabilitacao && (
+          <div className="rounded-lg border border-[var(--border)] bg-white p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Landmark className="h-4 w-4 text-[#01696f]" />
+                <p className="text-xs font-bold uppercase text-[#01696f]">Habilitação</p>
+              </div>
+              <SourceChip label={habilitacao?.evidenciaCampo ? 'PDF' : 'Revisar'} tone={habilitacao?.evidenciaCampo ? 'ok' : 'warn'} />
             </div>
-          )}
-          {validadeProposta && (
-            <div className="rounded-md bg-[var(--background)] border border-[var(--border)] p-2.5">
-              <p className="text-[10px] text-[var(--muted)] uppercase tracking-wider">Validade</p>
-              <p className="text-sm font-semibold text-[var(--text)] mt-0.5">{validadeProposta}</p>
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {hasDisplayValue(habilitacao?.formaPagamento) && (
+                <div className="rounded-md border border-[var(--border)] bg-white p-2">
+                  <p className="text-[10px] font-semibold uppercase text-[var(--muted-foreground)]">Forma</p>
+                  <p className="text-sm font-semibold text-[var(--text)]">{habilitacao?.formaPagamento}</p>
+                </div>
+              )}
+              {hasHabilitacaoBanco && (
+                <div className="rounded-md border border-[var(--border)] bg-white p-2">
+                  <p className="text-[10px] font-semibold uppercase text-[var(--muted-foreground)]">Banco</p>
+                  <p className="text-sm font-semibold text-[var(--text)]">{habilitacao?.banco}</p>
+                </div>
+              )}
+              {hasHabilitacaoPrazo && (
+                <div className="rounded-md border border-[var(--border)] bg-white p-2">
+                  <p className="text-[10px] font-semibold uppercase text-[var(--muted-foreground)]">Prazo</p>
+                  <p className="text-sm font-semibold text-[var(--text)]">{habilitacao?.prazoAprovacao}</p>
+                </div>
+              )}
+              {habilitacao?.cancelamentoAutomatico && (
+                <div className="rounded-md border border-[var(--border)] bg-white p-2">
+                  <p className="text-[10px] font-semibold uppercase text-[var(--muted-foreground)]">Cancelamento</p>
+                  <p className="text-sm font-semibold text-[var(--text)]">Automático</p>
+                </div>
+              )}
             </div>
-          )}
-          {multaRescisoria && (
-            <div className="rounded-md bg-[var(--background)] border border-[var(--border)] p-2.5">
-              <p className="text-[10px] text-[var(--muted)] uppercase tracking-wider">Multa Rescisória</p>
-              <p className="text-sm font-semibold text-[var(--text)] mt-0.5">{multaRescisoria}</p>
+            <p className="mt-3 text-sm text-[var(--text)]">{habilitacao?.observacao || oldHabilitacao}</p>
+          </div>
+        )}
+
+        {hasScale && (
+          <div className="rounded-lg border border-[#01696f]/25 bg-white p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-bold uppercase text-[#01696f]">Escala da mensalidade</p>
+                <p className="mt-1 text-sm text-[var(--text)]">Valores por faixa de mês.</p>
+              </div>
+              <SourceChip label="PDF" tone="ok" />
             </div>
-          )}
-          {faturamentoServicos && (
-            <div className="rounded-md bg-[var(--background)] border border-[var(--border)] p-2.5">
-              <p className="text-[10px] text-[var(--muted)] uppercase tracking-wider">Faturamento</p>
-              <p className="text-sm font-semibold text-[var(--text)] mt-0.5">{faturamentoServicos}</p>
+            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+              {mensalidade?.escala?.map((item, index) => (
+                <div key={`${item.periodo}-${item.valor}`} className="rounded-md border border-[var(--border)] bg-white p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-bold text-[var(--text)]">{item.periodo}</p>
+                    <span className="rounded-full bg-[#01696f] px-2 py-0.5 text-[10px] font-bold text-white">faixa {index + 1}</span>
+                  </div>
+                  <p className="mt-3 text-3xl font-bold leading-tight text-[#01696f]">{item.valor}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="rounded-lg border border-[#01696f]/25 bg-white p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Package className="h-4 w-4 text-[#01696f]" />
+              <p className="text-xs font-bold uppercase text-[#01696f]">Serviços</p>
+            </div>
+            <SourceChip label={condicoesPagamento?.faturamento?.evidenciaCampo || condicoesPagamento?.pacote?.evidenciaCampo ? 'PDF' : 'Revisar'} tone={condicoesPagamento?.faturamento?.evidenciaCampo || condicoesPagamento?.pacote?.evidenciaCampo ? 'ok' : 'warn'} />
+          </div>
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <div className="rounded-md border border-[var(--border)] bg-white p-2">
+              <p className="text-[10px] font-semibold uppercase text-[var(--muted-foreground)]">Faturamento</p>
+              <p className="text-sm font-semibold text-[var(--text)]">{faturamentoValue || 'Não encontrado no PDF'}</p>
+            </div>
+          </div>
+
+          {condicoesPagamento?.pacote && (
+            <div className="mt-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-bold uppercase text-[#01696f]">Faturamento por pacote</p>
+                <p className="mt-1 text-sm text-[var(--text)]">Marcos e percentuais mínimos de faturamento.</p>
+              </div>
+              <SourceChip label="PDF" tone="ok" />
+            </div>
+            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+              {condicoesPagamento.pacote.etapas.map((stage) => (
+                <div key={stage.etapa} className="rounded-md border border-[var(--border)] bg-white p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-bold text-[var(--text)]">{stage.etapa}</p>
+                    <span className="rounded-full bg-[#01696f] px-2 py-0.5 text-[10px] font-bold text-white">mín. {stage.percentualMinimo}</span>
+                  </div>
+                  <ul className="mt-2 space-y-1">
+                    {stage.marcos.map((marco) => (
+                      <li key={`${stage.etapa}-${marco.descricao}-${marco.percentual || ''}`} className="flex gap-1.5 text-[11px] leading-snug text-[var(--muted-foreground)]">
+                        <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-[#01696f]" />
+                        <span>
+                          {marco.descricao}
+                          {marco.percentual ? <strong className="ml-1 text-[#01696f]">{marco.percentual}</strong> : null}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
             </div>
           )}
         </div>
 
-        {/* Financiamento */}
-        {financiamento && (
-          <div className="rounded-md bg-[#cedcd8]/30 border border-[#01696f]/20 p-3">
-            <p className="text-[10px] text-[#01696f] font-semibold uppercase tracking-wider mb-1">Financiamento</p>
-            <p className="text-sm text-[var(--text)]">{financiamento}</p>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="rounded-md bg-white border border-[var(--border)] p-2.5">
+            <p className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider">Prazo Contratual</p>
+            <p className="text-sm font-semibold text-[var(--text)] mt-0.5">{prazoContratual || 'Verificar no CRM'}</p>
+          </div>
+          <div className="rounded-md bg-white border border-[var(--border)] p-2.5">
+            <p className="text-[10px] text-[var(--muted-foreground)] uppercase tracking-wider">Validade</p>
+            <p className="text-sm font-semibold text-[var(--text)] mt-0.5">{validadeProposta || 'Não encontrado no PDF'}</p>
+          </div>
+        </div>
+
+        {(hasFinanciamento || multaRescisoria) && (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {hasFinanciamento && (
+              <div className="rounded-md bg-[#cedcd8]/30 border border-[#01696f]/20 p-3">
+                <p className="text-[10px] text-[#01696f] font-semibold uppercase tracking-wider mb-1">Financiamento</p>
+                <p className="text-sm text-[var(--text)]">{financiamento}</p>
+              </div>
+            )}
+            {multaRescisoria && (
+              <div className="rounded-md bg-[var(--background)] border border-[var(--border)] p-3">
+                <p className="text-[10px] text-[var(--muted-foreground)] font-semibold uppercase tracking-wider mb-1">Multa Rescisória</p>
+                <p className="text-sm text-[var(--text)]">{multaRescisoria}</p>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -448,7 +597,7 @@ function MissingFieldsSection({ camposAusentes }: { camposAusentes: CamposAusent
           </div>
         )}
 
-        <p className="text-[10px] text-[var(--muted)] mt-2">
+        <p className="text-[10px] text-[var(--muted-foreground)] mt-2">
           Estes campos podem existir apenas no sistema CRM. Verifique manualmente quando necessário.
         </p>
       </div>
@@ -473,6 +622,8 @@ export default function ResultsView({
 }: ResultsViewProps) {
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 space-y-5">
+      <AuditHero extraction={extraction} resultado={resultado} />
+
       {/* Seção 1: Informações Gerais (Empresa + Executivo) */}
       <GeneralInfoSection extraction={extraction} />
 
@@ -492,6 +643,7 @@ export default function ResultsView({
       {/* Seção 5: 5. CONDIÇÕES DE PAGAMENTO */}
       <PaymentSection
         condicoes={extraction.condicoes}
+        condicoesPagamento={extraction.condicoesPagamento}
         prazoContratual={extraction.prazoContratual}
         validadeProposta={extraction.validadeProposta}
         multaRescisoria={extraction.multaRescisoria}
@@ -521,7 +673,7 @@ export default function ResultsView({
                     </li>
                   ))}
                 </ul>
-                <p className="mt-2 text-[10px] text-[var(--muted)]">
+                <p className="mt-2 text-[10px] text-[var(--muted-foreground)]">
                   Verifique esses campos diretamente no sistema CRM.
                 </p>
               </div>

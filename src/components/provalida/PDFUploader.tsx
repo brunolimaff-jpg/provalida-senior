@@ -14,6 +14,15 @@ interface PDFUploaderProps {
   onClear: () => void;
 }
 
+interface PDFTextResponse {
+  fileName: string;
+  fileSize: number;
+  numPages: number;
+  text: string;
+  hasText: boolean;
+  error?: string;
+}
+
 export default function PDFUploader({
   pdfFileName,
   pdfFileSize,
@@ -24,81 +33,31 @@ export default function PDFUploader({
   onClear,
 }: PDFUploaderProps) {
   const [isDragging, setIsDragging] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Extrair texto do PDF usando pdfjs-dist
-  // Agrupa itens por posição Y para reconstruir as linhas originais
   const extractTextFromPDF = useCallback(async (file: File) => {
+    setIsExtracting(true);
     try {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdfjsLib = await import('pdfjs-dist');
-      pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+      const formData = new FormData();
+      formData.append('file', file);
 
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer, verbosity: 0 }).promise;
-      const numPages = pdf.numPages;
-      let fullText = '';
+      const response = await fetch('/api/pdf-text', {
+        method: 'POST',
+        body: formData,
+      });
 
-      for (let i = 1; i <= numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
+      const result = await response.json() as PDFTextResponse;
 
-        // Agrupar itens por posição Y (mesma linha visual)
-        // Isso preserva a estrutura de linhas do documento original
-        interface TextItem {
-          str: string;
-          x: number;
-          y: number;
-          width: number;
-        }
-        const lineMap = new Map<string, TextItem[]>();
-        const Y_TOLERANCE = 3; // tolerância de 3px para considerar mesma linha
-
-        for (const item of textContent.items) {
-          const tItem = item as { str?: string; transform?: number[]; width?: number };
-          if (!tItem.str || tItem.str.trim() === '' || !tItem.transform) continue;
-
-          const x = tItem.transform[4];
-          const y = Math.round(tItem.transform[5]); // arredondar Y para agrupar
-          const w = tItem.width || 0;
-
-          // Encontrar linha existente dentro da tolerância
-          let matchedKey: string | null = null;
-          for (const key of lineMap.keys()) {
-            const existingY = parseInt(key);
-            if (Math.abs(y - existingY) <= Y_TOLERANCE) {
-              matchedKey = key;
-              break;
-            }
-          }
-
-          const entry: TextItem = { str: tItem.str, x, y, width: w };
-          if (matchedKey) {
-            lineMap.get(matchedKey)!.push(entry);
-          } else {
-            lineMap.set(String(y), [entry]);
-          }
-        }
-
-        // Ordenar linhas de cima para baixo (Y decrescente em PDF)
-        const sortedLines = [...lineMap.entries()]
-          .sort(([a], [b]) => parseInt(b) - parseInt(a));
-
-        for (const [, items] of sortedLines) {
-          // Ordenar itens da esquerda para a direita
-          items.sort((a, b) => a.x - b.x);
-          const lineText = items.map(i => i.str).join(' ');
-          fullText += lineText + '\n';
-        }
-
-        fullText += '\n'; // separar páginas
+      if (!response.ok || result.error) {
+        throw new Error(result.error || 'Erro ao processar o PDF.');
       }
 
-      const hasText = fullText.trim().length > 10;
-      console.log('[ProValida] Texto extraído do PDF (primeiros 2000 chars):', fullText.substring(0, 2000));
-      onFileLoaded(file.name, file.size, fullText, hasText);
+      console.log('[ProValida] Texto extraído do PDF (primeiros 2000 chars):', result.text.substring(0, 2000));
+      onFileLoaded(result.fileName || file.name, result.fileSize || file.size, result.text, result.hasText);
 
-      if (hasText) {
-        toast.success(`PDF carregado: ${numPages} página(s) extraída(s)`);
+      if (result.hasText) {
+        toast.success(`PDF carregado: ${result.numPages} página(s) extraída(s)`);
       } else {
         toast.warning('PDF sem texto extraível — tente enviar um PDF com texto');
       }
@@ -106,12 +65,14 @@ export default function PDFUploader({
       console.error('Erro ao extrair texto do PDF:', error);
       onFileLoaded(file.name, file.size, '', false);
       toast.error('Erro ao processar o PDF.');
+    } finally {
+      setIsExtracting(false);
     }
   }, [onFileLoaded]);
 
   const handleFile = useCallback((file: File) => {
-    if (!file.name.endsWith('.pdf') && !file.name.endsWith('.docx')) {
-      toast.error('Formato não suportado. Use PDF ou DOCX.');
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      toast.error('Formato não suportado. Use PDF.');
       return;
     }
     extractTextFromPDF(file);
@@ -156,12 +117,12 @@ export default function PDFUploader({
               </div>
               <div>
                 <p className="text-sm font-semibold text-[var(--text)]">{pdfFileName}</p>
-                <p className="text-xs text-[var(--muted)]">{formatSize(pdfFileSize)}</p>
+                <p className="text-xs text-[var(--muted-foreground)]">{formatSize(pdfFileSize)}</p>
               </div>
             </div>
             <button
               onClick={onClear}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--muted)] hover:bg-[#e0ced7] hover:text-[#a12c7b] transition-colors duration-180"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--muted-foreground)] hover:bg-[#e0ced7] hover:text-[#a12c7b] transition-colors duration-180"
               aria-label="Remover arquivo"
             >
               <X className="h-4 w-4" />
@@ -179,7 +140,7 @@ export default function PDFUploader({
 
           {pdfHasText && pdfTextPreview && (
             <div className="rounded-lg bg-[var(--surface)] p-3 border border-[var(--border)]">
-              <p className="text-[10px] font-semibold text-[var(--muted)] mb-1.5 uppercase tracking-wider">Pré-visualização do texto</p>
+              <p className="text-[10px] font-semibold text-[var(--muted-foreground)] mb-1.5 uppercase tracking-wider">Pré-visualização do texto</p>
               <p className="text-xs text-[var(--text)] leading-relaxed whitespace-pre-wrap" style={{ maxHeight: '120px', overflow: 'hidden' }}>
                 {pdfTextPreview}
               </p>
@@ -195,28 +156,28 @@ export default function PDFUploader({
       onDrop={handleDrop}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
-      onClick={() => !isLoading && fileInputRef.current?.click()}
+      onClick={() => !isLoading && !isExtracting && fileInputRef.current?.click()}
       className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-10 transition-all duration-180 ${
         isDragging
           ? 'border-[#01696f] bg-[#cedcd8]/50 scale-[1.01]'
           : 'border-[var(--border)] bg-[var(--background)] hover:border-[#01696f] hover:bg-[#cedcd8]/20'
-      } ${isLoading ? 'pointer-events-none opacity-60' : ''}`}
+      } ${isLoading || isExtracting ? 'pointer-events-none opacity-60' : ''}`}
     >
-      {isLoading ? (
+      {isLoading || isExtracting ? (
         <Loader2 className="h-10 w-10 mb-3 text-[#01696f] animate-spin" />
       ) : (
-        <Upload className={`h-10 w-10 mb-3 ${isDragging ? 'text-[#01696f]' : 'text-[var(--muted)]'}`} />
+        <Upload className={`h-10 w-10 mb-3 ${isDragging ? 'text-[#01696f]' : 'text-[var(--muted-foreground)]'}`} />
       )}
       <p className="text-base font-semibold text-[var(--text)]">
-        {isLoading ? 'Processando...' : 'Anexe a proposta comercial'}
+        {isLoading || isExtracting ? 'Processando...' : 'Anexe a proposta comercial'}
       </p>
-      <p className="text-sm text-[var(--muted)] mt-1">
+      <p className="text-sm text-[var(--muted-foreground)] mt-1">
         Arraste o PDF aqui ou clique para selecionar
       </p>
       <input
         ref={fileInputRef}
         type="file"
-        accept=".pdf,.docx"
+        accept=".pdf,application/pdf"
         onChange={handleInputChange}
         className="hidden"
       />

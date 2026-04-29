@@ -186,3 +186,51 @@ export const PROCESSING_STEPS = [
   'Calculando valores com e sem impostos...',
   'Preparando resultados...'
 ];
+
+export const LAYOUT_OPTIONS = [
+  'Senior',
+  'Cliente',
+  'Parceiro',
+  'Personalizado',
+];
+
+export const PRAZO_OPTIONS = [
+  'À vista',
+  '15 dias',
+  '20 dias',
+  '30 dias',
+  'BTG - Taxa de Juros: 0,00%',
+];
+
+export const COBRANCA_OPTIONS = [
+  'Não cobrar',
+  'Conforme RDV',
+  '14 dias após RDV',
+  'Reembolsável',
+];
+
+export const ESCOPO_OPTIONS = [
+  'Aberto',
+  'Fechado',
+  'Sob demanda',
+];
+
+export const FATURAMENTO_OPTIONS = [
+  'Antecipado',
+  'Pós-entrega',
+  'Mensal',
+  'Por pacote',
+  'Por marco',
+];
+
+export const ALIQUOTA_OPTIONS = [
+  'Alíquota padrão',
+  'Alíquota média',
+  'Sem incidência',
+];
+
+export const IMPOSTOS_OPTIONS = [
+  'Impostos já inclusos',
+  'Impostos não inclusos',
+  'Verificar com fiscal',
+];

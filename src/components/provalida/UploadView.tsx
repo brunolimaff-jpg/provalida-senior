@@ -36,7 +36,7 @@ export default function UploadView({
         <h1 className="text-2xl font-bold text-[var(--text)]">
           Anexe a proposta comercial
         </h1>
-        <p className="mt-2 text-sm text-[var(--muted)] max-w-md mx-auto">
+        <p className="mt-2 text-sm text-[var(--muted-foreground)] max-w-md mx-auto">
           Faça upload do PDF da proposta e o ProValida extrairá automaticamente todos os campos e validará as regras de negócio.
         </p>
       </div>
@@ -57,7 +57,7 @@ export default function UploadView({
       {/* Info sobre campos do CRM */}
       <div className="mt-4 rounded-xl border border-[#964219]/30 bg-[#ddcfc6]/40 p-4">
         <p className="text-xs font-semibold text-[#964219] mb-2">⚠ Campos que podem não aparecer na proposta</p>
-        <p className="text-xs text-[var(--muted)]">
+        <p className="text-xs text-[var(--muted-foreground)]">
           Alguns campos existem apenas no CRM e não estão no PDF: <strong>Revisão</strong>, <strong>Tipo Alíquota</strong>, <strong>Imposto CCI</strong>, <strong>Motivo da Reprogramação</strong>, <strong>Responsável pelo Suporte</strong>, <strong>Layout</strong>, <strong>Cobrança de Despesas</strong>. Esses serão sinalizados para verificação manual.
         </p>
       </div>

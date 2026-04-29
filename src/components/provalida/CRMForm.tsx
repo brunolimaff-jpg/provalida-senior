@@ -32,7 +32,7 @@ export default function CRMForm({ crmData, onChange }: CRMFormProps) {
 
       {/* Número da Proposta */}
       <div className="space-y-1">
-        <label className="text-xs font-medium text-[var(--muted)]">Número da Proposta *</label>
+        <label className="text-xs font-medium text-[var(--muted-foreground)]">Número da Proposta *</label>
         <input
           type="text"
           value={crmData.numeroProposta}
@@ -44,7 +44,7 @@ export default function CRMForm({ crmData, onChange }: CRMFormProps) {
 
       {/* Código da Proposta */}
       <div className="space-y-1">
-        <label className="text-xs font-medium text-[var(--muted)]">Código da Proposta *</label>
+        <label className="text-xs font-medium text-[var(--muted-foreground)]">Código da Proposta *</label>
         <input
           type="text"
           value={crmData.codigoProposta}
@@ -57,7 +57,7 @@ export default function CRMForm({ crmData, onChange }: CRMFormProps) {
       {/* Revisão e Motivo da Reprogramação */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
-          <label className="text-xs font-medium text-[var(--muted)]">Revisão *</label>
+          <label className="text-xs font-medium text-[var(--muted-foreground)]">Revisão *</label>
           <input
             type="number"
             value={crmData.revisao}
@@ -68,7 +68,7 @@ export default function CRMForm({ crmData, onChange }: CRMFormProps) {
           />
         </div>
         <div className="space-y-1">
-          <label className="text-xs font-medium text-[var(--muted)]">
+          <label className="text-xs font-medium text-[var(--muted-foreground)]">
             Motivo Reprogramação
             {showReprogramacaoWarning && (
               <span className="ml-1 text-[#964219]">⚠ Obrigatório</span>
@@ -90,7 +90,7 @@ export default function CRMForm({ crmData, onChange }: CRMFormProps) {
 
       {/* Layout */}
       <div className="space-y-1">
-        <label className="text-xs font-medium text-[var(--muted)]">Layout *</label>
+        <label className="text-xs font-medium text-[var(--muted-foreground)]">Layout *</label>
         <select
           value={crmData.layout}
           onChange={(e) => updateField('layout', e.target.value)}
@@ -105,7 +105,7 @@ export default function CRMForm({ crmData, onChange }: CRMFormProps) {
 
       {/* Prazo de Pagamento Módulos */}
       <div className="space-y-1">
-        <label className="text-xs font-medium text-[var(--muted)]">Prazo Pagamento Módulos *</label>
+        <label className="text-xs font-medium text-[var(--muted-foreground)]">Prazo Pagamento Módulos *</label>
         <select
           value={crmData.prazoPagamentoModulos}
           onChange={(e) => updateField('prazoPagamentoModulos', e.target.value)}
@@ -120,7 +120,7 @@ export default function CRMForm({ crmData, onChange }: CRMFormProps) {
 
       {/* Prazo de Pagamento Serviços */}
       <div className="space-y-1">
-        <label className="text-xs font-medium text-[var(--muted)]">Prazo Pagamento Serviços *</label>
+        <label className="text-xs font-medium text-[var(--muted-foreground)]">Prazo Pagamento Serviços *</label>
         <select
           value={crmData.prazoPagamentoServicos}
           onChange={(e) => updateField('prazoPagamentoServicos', e.target.value)}
@@ -136,7 +136,7 @@ export default function CRMForm({ crmData, onChange }: CRMFormProps) {
       {/* Carência e Desconto */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
-          <label className="text-xs font-medium text-[var(--muted)]">Carência (meses)</label>
+          <label className="text-xs font-medium text-[var(--muted-foreground)]">Carência (meses)</label>
           <input
             type="number"
             value={crmData.carenciaMeses}
@@ -147,7 +147,7 @@ export default function CRMForm({ crmData, onChange }: CRMFormProps) {
           />
         </div>
         <div className="space-y-1">
-          <label className="text-xs font-medium text-[var(--muted)]">Desconto Carência (%)</label>
+          <label className="text-xs font-medium text-[var(--muted-foreground)]">Desconto Carência (%)</label>
           <input
             type="number"
             value={crmData.descontoCarencia}
@@ -162,7 +162,7 @@ export default function CRMForm({ crmData, onChange }: CRMFormProps) {
 
       {/* Cobrança de Despesas */}
       <div className="space-y-1">
-        <label className="text-xs font-medium text-[var(--muted)]">Cobrança de Despesas</label>
+        <label className="text-xs font-medium text-[var(--muted-foreground)]">Cobrança de Despesas</label>
         <select
           value={crmData.cobrancaDespesas}
           onChange={(e) => updateField('cobrancaDespesas', e.target.value)}
@@ -177,7 +177,7 @@ export default function CRMForm({ crmData, onChange }: CRMFormProps) {
 
       {/* Representante */}
       <div className="space-y-1">
-        <label className="text-xs font-medium text-[var(--muted)]">Representante *</label>
+        <label className="text-xs font-medium text-[var(--muted-foreground)]">Representante *</label>
         <input
           type="text"
           value={crmData.representante}
@@ -189,7 +189,7 @@ export default function CRMForm({ crmData, onChange }: CRMFormProps) {
 
       {/* Escopo */}
       <div className="space-y-1">
-        <label className="text-xs font-medium text-[var(--muted)]">Escopo *</label>
+        <label className="text-xs font-medium text-[var(--muted-foreground)]">Escopo *</label>
         <select
           value={crmData.escopo}
           onChange={(e) => updateField('escopo', e.target.value)}
@@ -204,7 +204,7 @@ export default function CRMForm({ crmData, onChange }: CRMFormProps) {
 
       {/* Faturamento de Serviços */}
       <div className="space-y-1">
-        <label className="text-xs font-medium text-[var(--muted)]">Faturamento Serviços *</label>
+        <label className="text-xs font-medium text-[var(--muted-foreground)]">Faturamento Serviços *</label>
         <select
           value={crmData.faturamentoServicos}
           onChange={(e) => updateField('faturamentoServicos', e.target.value)}
@@ -219,7 +219,7 @@ export default function CRMForm({ crmData, onChange }: CRMFormProps) {
 
       {/* Tipo Alíquota */}
       <div className="space-y-1">
-        <label className="text-xs font-medium text-[var(--muted)]">Tipo Alíquota *</label>
+        <label className="text-xs font-medium text-[var(--muted-foreground)]">Tipo Alíquota *</label>
         <select
           value={crmData.tipoAliquota}
           onChange={(e) => updateField('tipoAliquota', e.target.value)}
@@ -234,7 +234,7 @@ export default function CRMForm({ crmData, onChange }: CRMFormProps) {
 
       {/* Imposto CCI */}
       <div className="space-y-1">
-        <label className="text-xs font-medium text-[var(--muted)]">Imposto CCI (%)</label>
+        <label className="text-xs font-medium text-[var(--muted-foreground)]">Imposto CCI (%)</label>
         <input
           type="number"
           value={crmData.impostoCCI}
@@ -249,7 +249,7 @@ export default function CRMForm({ crmData, onChange }: CRMFormProps) {
 
       {/* Impostos */}
       <div className="space-y-1">
-        <label className="text-xs font-medium text-[var(--muted)]">Impostos *</label>
+        <label className="text-xs font-medium text-[var(--muted-foreground)]">Impostos *</label>
         <select
           value={crmData.impostos}
           onChange={(e) => updateField('impostos', e.target.value)}
@@ -264,7 +264,7 @@ export default function CRMForm({ crmData, onChange }: CRMFormProps) {
 
       {/* Responsável Suporte */}
       <div className="space-y-1">
-        <label className="text-xs font-medium text-[var(--muted)]">Responsável Suporte</label>
+        <label className="text-xs font-medium text-[var(--muted-foreground)]">Responsável Suporte</label>
         <input
           type="text"
           value={crmData.responsavelSuporte}
@@ -276,7 +276,7 @@ export default function CRMForm({ crmData, onChange }: CRMFormProps) {
 
       {/* Possui Rateio */}
       <div className="space-y-1">
-        <label className="text-xs font-medium text-[var(--muted)]">Possui Rateio? *</label>
+        <label className="text-xs font-medium text-[var(--muted-foreground)]">Possui Rateio? *</label>
         <div className="flex gap-3">
           {['Sim', 'Não'].map((opt) => (
             <label
@@ -284,7 +284,7 @@ export default function CRMForm({ crmData, onChange }: CRMFormProps) {
               className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm cursor-pointer transition-colors duration-180 ${
                 crmData.possuiRateio === opt
                   ? 'border-[#01696f] bg-[#cedcd8] text-[#01696f] font-medium'
-                  : 'border-[var(--border)] bg-[var(--background)] text-[var(--muted)]'
+                  : 'border-[var(--border)] bg-[var(--background)] text-[var(--muted-foreground)]'
               }`}
             >
               <input
@@ -304,7 +304,7 @@ export default function CRMForm({ crmData, onChange }: CRMFormProps) {
       {/* Tabela de Rateio (condicional) */}
       {crmData.possuiRateio === 'Sim' && (
         <div className="space-y-1">
-          <label className="text-xs font-medium text-[var(--muted)]">Contas de Rateio</label>
+          <label className="text-xs font-medium text-[var(--muted-foreground)]">Contas de Rateio</label>
           <RateioTable
             contas={crmData.contasRateio}
             onChange={(contas) => updateField('contasRateio', contas)}

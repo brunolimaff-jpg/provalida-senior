@@ -39,7 +39,7 @@ export default function ScoreCard({ resultado }: ScoreCardProps) {
         {/* Classificação e resumo */}
         <div className="min-w-0">
           <p className="text-base font-semibold text-[var(--text)]">{classificacaoLabel}</p>
-          <p className="mt-1 text-xs text-[var(--muted)] line-clamp-2">{resumo}</p>
+          <p className="mt-1 text-xs text-[var(--muted-foreground)] line-clamp-2">{resumo}</p>
         </div>
       </div>
 

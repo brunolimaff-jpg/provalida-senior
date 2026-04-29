@@ -1,10 +1,10 @@
 import jsPDF from 'jspdf';
-import type { ValidationResult } from '@/components/provalida/types';
+import type { ExtractionResult, ValidationResult } from '@/components/provalida/types';
 
 /**
  * Gera um relatório PDF com os resultados da validação.
  */
-export function exportPDF(resultado: ValidationResult, numeroProposta: string): void {
+export function exportPDF(resultado: ValidationResult, numeroProposta: string, extraction?: ExtractionResult): void {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 20;
@@ -83,6 +83,31 @@ export function exportPDF(resultado: ValidationResult, numeroProposta: string): 
   addText(resultado.resumo, margin, 10);
   y += 4;
   addSeparator();
+
+  if (extraction) {
+    const mensalidade = extraction.investimentos.find(item => item.descricao === 'Mensalidade');
+    const habilitacao = extraction.investimentos.find(item => item.descricao === 'Habilitação + Serviços');
+
+    addText('Resumo auditável', margin, 12, true);
+    addText(`Cliente: ${extraction.cliente || 'Não encontrado no PDF'}`, margin, 9);
+    addText(`Código: ${extraction.codigoProposta || 'Não encontrado no PDF'}`, margin, 9);
+    addText(`Mensalidade contratual: ${mensalidade?.valorComImposto || 'Não encontrada'} | sem impostos: ${mensalidade?.valorSemImposto || 'Não encontrada'}`, margin, 9);
+    if (mensalidade?.evidenciaCampo) addText(`Evidência: ${mensalidade.evidenciaCampo}`, margin + 4, 8);
+    addText(`Habilitação + Serviços: ${habilitacao?.valorComImposto || 'Não encontrada'} | sem impostos: ${habilitacao?.valorSemImposto || 'Não encontrada'}`, margin, 9);
+    if (habilitacao?.evidenciaCampo) addText(`Evidência: ${habilitacao.evidenciaCampo}`, margin + 4, 8);
+    addText(`Condição da mensalidade: ${extraction.condicoesPagamento?.mensalidade.observacao || 'Não encontrada no PDF'}`, margin, 9);
+    addText(`Financiamento: ${extraction.financiamento || 'Não encontrado no PDF'}`, margin, 9);
+    addText(`Faturamento: ${extraction.faturamentoServicos || 'Não encontrado no PDF'}`, margin, 9);
+    if (extraction.condicoesPagamento?.pacote) {
+      addText(`Faturamento por pacote: ${extraction.condicoesPagamento.pacote.observacao}`, margin, 9);
+      for (const stage of extraction.condicoesPagamento.pacote.etapas) {
+        const marcos = stage.marcos.map(marco => `${marco.descricao}${marco.percentual ? ` (${marco.percentual})` : ''}`).join(' | ');
+        addText(`${stage.etapa} (mínimo ${stage.percentualMinimo}): ${marcos}`, margin + 4, 8);
+      }
+    }
+    y += 4;
+    addSeparator();
+  }
 
   // === LISTA DE ITENS ===
   for (const item of resultado.itens) {

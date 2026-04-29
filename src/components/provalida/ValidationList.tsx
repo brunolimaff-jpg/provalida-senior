@@ -25,7 +25,7 @@ export default function ValidationList({ itens, onApplyCorrection, onCopySuggest
         />
       ))}
       {itens.length === 0 && (
-        <p className="py-8 text-center text-sm text-[var(--muted)]">Nenhum item encontrado.</p>
+        <p className="py-8 text-center text-sm text-[var(--muted-foreground)]">Nenhum item encontrado.</p>
       )}
     </div>
   );

@@ -42,7 +42,7 @@ export default function ProcessingView({ currentStepOverride }: ProcessingViewPr
         {/* Título */}
         <div className="text-center">
           <h2 className="text-lg font-semibold text-[var(--text)]">Analisando proposta...</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">Extraindo campos e validando regras</p>
+          <p className="mt-1 text-sm text-[var(--muted-foreground)]">Extraindo campos e validando regras</p>
         </div>
 
         {/* Barra de progresso */}
@@ -53,7 +53,7 @@ export default function ProcessingView({ currentStepOverride }: ProcessingViewPr
               style={{ width: `${Math.min(progress, 100)}%` }}
             />
           </div>
-          <p className="text-right text-xs text-[var(--muted)]">{Math.round(Math.min(progress, 100))}%</p>
+          <p className="text-right text-xs text-[var(--muted-foreground)]">{Math.round(Math.min(progress, 100))}%</p>
         </div>
 
         {/* Lista de passos */}
@@ -70,7 +70,7 @@ export default function ProcessingView({ currentStepOverride }: ProcessingViewPr
                     ? 'bg-[#d4dfcc] text-[#437a22]'
                     : isCurrent
                     ? 'bg-[#cedcd8] text-[#01696f]'
-                    : 'bg-[var(--background)] text-[var(--muted)]'
+                    : 'bg-[var(--background)] text-[var(--muted-foreground)]'
                 }`}
               >
                 <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
@@ -78,7 +78,7 @@ export default function ProcessingView({ currentStepOverride }: ProcessingViewPr
                     ? 'bg-[#437a22] text-white'
                     : isCurrent
                     ? 'bg-[#01696f] text-white'
-                    : 'bg-[var(--border)] text-[var(--muted)]'
+                    : 'bg-[var(--border)] text-[var(--muted-foreground)]'
                 }`}>
                   {isCompleted ? (
                     <Check className="h-3.5 w-3.5" />

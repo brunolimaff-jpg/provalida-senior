@@ -9,8 +9,20 @@ export interface ExtractedField {
   campo: string;
   valor: string;
   encontrado: boolean;
-  origem: 'pdf' | 'inferido' | 'nao_encontrado';
+  origem: EvidenceOrigin | 'nao_encontrado';
   trechoPDF?: string;
+}
+
+export type EvidenceOrigin = 'pdf' | 'inferido' | 'ia' | 'manual';
+export type EvidenceConfidence = 'alta' | 'media' | 'baixa';
+export type AuditStatus = 'confirmado' | 'inferido' | 'revisar';
+
+export interface ParsedEvidence {
+  trecho: string;
+  origem: EvidenceOrigin;
+  confianca: EvidenceConfidence;
+  secao?: string;
+  pagina?: number;
 }
 
 // --- Módulos ---
@@ -32,6 +44,9 @@ export interface InvestimentoItem {
   descricao: string;      // Ex: "Mensalidade", "Habilitação + Serviços"
   valorComImposto: string; // Ex: "R$ 15.240,80"
   valorSemImposto: string; // Ex: "R$ 13.792,58"
+  origem?: EvidenceOrigin;
+  confianca?: EvidenceConfidence;
+  evidenciaCampo?: string;
 }
 
 // --- Condições de Pagamento ---
@@ -40,6 +55,84 @@ export interface CondicaoPagamento {
   condicao: string;       // Ex: "06 primeiras parcelas com 50% de desconto — R$ 7.620,40"
   descontoHabilitacao?: string; // Ex: "Não informado" ou valor do desconto
   descontoServicos?: string;    // Ex: "Não informado" ou valor do desconto
+}
+
+export interface PaymentTermDetail {
+  descricao: string;
+  valor?: string;
+  observacao?: string;
+  status?: AuditStatus;
+  evidenciaCampo?: string;
+}
+
+export interface BillingPackageStage {
+  etapa: 'Início' | 'Execução' | 'Finalização';
+  percentualMinimo: string;
+  marcos: Array<{
+    descricao: string;
+    percentual?: string;
+  }>;
+}
+
+export interface CondicoesPagamentoDetalhadas {
+  mensalidade: {
+    valorCheio?: string;
+    valorComDesconto?: string;
+    descontoPercentual?: string;
+    parcelasComDesconto?: string;
+    escala?: Array<{
+      periodo: string;
+      valor: string;
+    }>;
+    vencimento?: string;
+    observacao?: string;
+    evidenciaCampo?: string;
+  };
+  habilitacaoServicos: {
+    formaPagamento?: string;
+    banco?: string;
+    prazoAprovacao?: string;
+    cancelamentoAutomatico?: boolean;
+    observacao?: string;
+    evidenciaCampo?: string;
+  };
+  financiamento?: PaymentTermDetail;
+  faturamento?: PaymentTermDetail;
+  despesas?: PaymentTermDetail;
+  pacote?: {
+    modalidade: 'Por pacote';
+    observacao: string;
+    etapas: BillingPackageStage[];
+    evidenciaCampo?: string;
+  };
+}
+
+export interface ParsedInvestment {
+  descricao: 'Mensalidade' | 'Habilitação + Serviços';
+  valorSemImposto: number | null;
+  valorComImposto: number | null;
+  evidencia: ParsedEvidence;
+}
+
+export interface ParsedPaymentTerms {
+  condicoes: CondicoesPagamentoDetalhadas;
+  condicaoMensalidade: string;
+  condicaoHabilitacao: string;
+  descontoHabilitacao: string;
+  descontoServicos: string;
+  prazoContratual: string;
+  validadeProposta: string;
+  multaRescisoria: string;
+  faturamentoServicos: string;
+  financiamento: string;
+}
+
+export interface ProposalAuditSummary {
+  cliente: string;
+  codigoProposta: string;
+  status: AuditStatus;
+  riscos: string[];
+  valoresCriticos: Pick<ExtractionResult, 'investimentos' | 'condicoesPagamento'>;
 }
 
 // --- Campos que podem não estar na proposta ---
@@ -87,6 +180,7 @@ export interface ExtractionResult {
 
   // 5. CONDIÇÕES DE PAGAMENTO
   condicoes: CondicaoPagamento[];
+  condicoesPagamento?: CondicoesPagamentoDetalhadas;
   prazoContratual: string;
   validadeProposta: string;
   multaRescisoria: string;
@@ -105,6 +199,8 @@ export interface ExtractionResult {
 
   // Campos flat para compatibilidade com validação
   campos: ExtractedField[];
+  evidencias?: Record<string, ParsedEvidence>;
+  resumoAuditoria?: ProposalAuditSummary;
 
   // Texto bruto
   textoBruto: string;
