@@ -1,4 +1,3 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
@@ -21,22 +20,15 @@ interface TextItem {
 // `process.cwd()` — em ambientes serverless (Vercel) o cwd é `/var/task`
 // e o caminho relativo nem sempre aponta para o bundle correto.
 // A resolução é lazy para não falhar durante o collect-page-data do build.
-let pdfjsAssetsCache: { standardFontDataUrl: string; workerSrcConfigured: boolean } | null = null;
+let standardFontDataUrlCache: string | null = null;
 
 function resolvePdfjsAssets(): { standardFontDataUrl: string } {
-  if (pdfjsAssetsCache) return pdfjsAssetsCache;
+  if (standardFontDataUrlCache) return { standardFontDataUrl: standardFontDataUrlCache };
   const requireFromHere = createRequire(import.meta.url);
   const pdfjsPackageRoot = path.dirname(requireFromHere.resolve('pdfjs-dist/package.json'));
   const standardFontsDir = path.join(pdfjsPackageRoot, 'standard_fonts');
-  const workerFilePath = path.join(pdfjsPackageRoot, 'legacy/build/pdf.worker.mjs');
-  const standardFontDataUrl = pathToFileURL(standardFontsDir + path.sep).href;
-  let workerSrcConfigured = false;
-  if (fs.existsSync(workerFilePath)) {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = pathToFileURL(workerFilePath).href;
-    workerSrcConfigured = true;
-  }
-  pdfjsAssetsCache = { standardFontDataUrl, workerSrcConfigured };
-  return pdfjsAssetsCache;
+  standardFontDataUrlCache = pathToFileURL(standardFontsDir + path.sep).href;
+  return { standardFontDataUrl: standardFontDataUrlCache };
 }
 
 function appendPageText(items: unknown[]): string {
@@ -111,10 +103,11 @@ export async function POST(request: NextRequest) {
     const { standardFontDataUrl } = resolvePdfjsAssets();
     const pdf = await pdfjsLib.getDocument({
       data: pdfBytes,
+      disableWorker: true,
       standardFontDataUrl,
       verbosity: 0,
       useSystemFonts: true,
-    }).promise;
+    } as Parameters<typeof pdfjsLib.getDocument>[0] & { disableWorker: boolean }).promise;
 
     let text = '';
 
