@@ -116,6 +116,16 @@ de 13 a 36 meses no valor de R$ 59.126,74 e após o mês 37 no valor de R$
 6. APROVAÇÃO
 `;
 
+const MONTHLY_SCALE_WITH_EXTRACTED_TEXT_GAPS_SNIPPET = `
+5. CONDIÇÕES DE PAGAMENTO
+O vencimento será mensal, no dia 20 de cada mês, com o primeiro
+pagamento ocorrendo no mês posterior ao da assinatura da proposta e/ou
+contrato, seguindo a seguinte regra: de 1 a 12 meses no valor de R$ 29.563,37
+SaaS 13 a 36 meses no valor de 59.126,74 e após o mês 37 no valor de R$
+67.899,33, seguindo reajuste a partir do 37º sendo aplicado ao 49º mês.
+6. APROVAÇÃO
+`;
+
 const CARENCIA_MENSALIDADE_SNIPPET = `
 5. CONDIÇÕES DE PAGAMENTO
 O vencimento será mensal, no dia 20 de cada mês, com o primeiro
@@ -243,6 +253,16 @@ describe('parser financeiro ProValida', () => {
       { periodo: 'Após o mês 37', valor: 'R$ 67.899,33' },
     ]);
     expect(condicoes.condicaoMensalidade).toContain('Escala de mensalidade');
+  });
+
+  it('extrai faixa intermediária quando o texto do PDF perde de ou R$', () => {
+    const condicoes = extrairCondicoesDoPDF(MONTHLY_SCALE_WITH_EXTRACTED_TEXT_GAPS_SNIPPET);
+
+    expect(condicoes.detalhes?.mensalidade.escala).toEqual([
+      { periodo: '1 a 12 meses', valor: 'R$ 29.563,37' },
+      { periodo: '13 a 36 meses', valor: 'R$ 59.126,74' },
+      { periodo: 'Após o mês 37', valor: 'R$ 67.899,33' },
+    ]);
   });
 
   it('extrai carência/desconto de mensalidade por meses', () => {

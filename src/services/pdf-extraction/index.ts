@@ -358,11 +358,11 @@ function parseMonthlyPaymentScale(text: string): Array<{ periodo: string; valor:
   const normalized = text.replace(/\s+/g, ' ');
   const patterns: Array<{ regex: RegExp; label: (match: RegExpMatchArray) => string }> = [
     {
-      regex: /de\s+(\d+)\s+a\s+(\d+)\s+meses?\s+no\s+valor\s+de\s+R\$\s*([\d.]+,\d{2})/gi,
+      regex: /(?:\bde\s+)?(\d+)\s+a\s+(\d+)\s+meses?\s+no\s+valor\s+de\s+(?:R\$\s*)?([\d.]+,\d{2})/gi,
       label: match => `${match[1]} a ${match[2]} meses`,
     },
     {
-      regex: /ap[óo]s\s+o\s+m[eê]s\s+(\d+)\s+no\s+valor\s+de\s+R\$\s*([\d.]+,\d{2})/gi,
+      regex: /ap[óo]s\s+o\s+m[eê]s\s+(\d+)\s+no\s+valor\s+de\s+(?:R\$\s*)?([\d.]+,\d{2})/gi,
       label: match => `Após o mês ${match[1]}`,
     },
   ];
