@@ -121,8 +121,8 @@ const MONTHLY_SCALE_WITH_EXTRACTED_TEXT_GAPS_SNIPPET = `
 O vencimento será mensal, no dia 20 de cada mês, com o primeiro
 pagamento ocorrendo no mês posterior ao da assinatura da proposta e/ou
 contrato, seguindo a seguinte regra: de 1 a 12 meses no valor de R$ 29.563,37
-SaaS 13 a 36 meses no valor de 59.126,74 e após o mês 37 no valor de R$
-67.899,33, seguindo reajuste a partir do 37º sendo aplicado ao 49º mês.
+SaaS 13 a 36 meses no valor de R $ 59. 126,74 e após o mês 37 no valor de R $
+67. 899,33, seguindo reajuste a partir do 37º sendo aplicado ao 49º mês.
 6. APROVAÇÃO
 `;
 

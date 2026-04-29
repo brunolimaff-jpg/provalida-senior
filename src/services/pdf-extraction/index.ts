@@ -354,33 +354,41 @@ function cleanPaymentSentence(text: string): string {
     .trim();
 }
 
+function normalizeScaleValue(value: string): string {
+  return `R$ ${value.replace(/\s+/g, '').replace(/^R\$?/, '')}`;
+}
+
 function parseMonthlyPaymentScale(text: string): Array<{ periodo: string; valor: string }> {
   const normalized = text.replace(/\s+/g, ' ');
-  const patterns: Array<{ regex: RegExp; label: (match: RegExpMatchArray) => string }> = [
+  const moneyPattern = String.raw`(?:R\s*\$\s*)?([\d.\s]+,\s*\d{2})`;
+  const patterns: Array<{ regex: RegExp; label: (match: RegExpMatchArray) => string; valueIndex: number }> = [
     {
-      regex: /(?:\bde\s+)?(\d+)\s+a\s+(\d+)\s+meses?\s+no\s+valor\s+de\s+(?:R\$\s*)?([\d.]+,\d{2})/gi,
+      regex: new RegExp(String.raw`(?:\bde\s+|\bdo\s+)?(\d+)(?:[º°])?\s+(?:a|ao)\s+(\d+)(?:[º°])?\s+m(?:e|ê)s(?:es)?\b.{0,120}?${moneyPattern}`, 'gi'),
       label: match => `${match[1]} a ${match[2]} meses`,
+      valueIndex: 3,
     },
     {
-      regex: /ap[óo]s\s+o\s+m[eê]s\s+(\d+)\s+no\s+valor\s+de\s+(?:R\$\s*)?([\d.]+,\d{2})/gi,
+      regex: new RegExp(String.raw`ap[óo]s\s+o\s+m[eê]s\s+(\d+)(?:[º°])?\b.{0,120}?${moneyPattern}`, 'gi'),
       label: match => `Após o mês ${match[1]}`,
+      valueIndex: 2,
     },
   ];
 
   const steps: Array<{ index: number; periodo: string; valor: string }> = [];
 
-  for (const { regex, label } of patterns) {
+  for (const { regex, label, valueIndex } of patterns) {
     for (const match of normalized.matchAll(regex)) {
       steps.push({
         index: match.index ?? 0,
         periodo: label(match),
-        valor: `R$ ${match[match.length - 1]}`,
+        valor: normalizeScaleValue(match[valueIndex]),
       });
     }
   }
 
   return steps
     .sort((a, b) => a.index - b.index)
+    .filter((item, index, list) => list.findIndex(candidate => candidate.periodo === item.periodo) === index)
     .map(({ periodo, valor }) => ({ periodo, valor }));
 }
 
