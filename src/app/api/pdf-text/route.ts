@@ -13,19 +13,6 @@ interface TextItem {
   width: number;
 }
 
-// Resolve os arquivos do pdfjs-dist via import.meta.resolve em vez de
-// createRequire.resolve. No bundle serverless com Turbopack, createRequire
-// pode virar um ID numérico interno e quebrar chamadas de path.dirname().
-// A resolução é lazy para não falhar durante o collect-page-data do build.
-let standardFontDataUrlCache: string | null = null;
-
-function resolvePdfjsAssets(): { standardFontDataUrl: string } {
-  if (standardFontDataUrlCache) return { standardFontDataUrl: standardFontDataUrlCache };
-  const standardFontFileUrl = import.meta.resolve('pdfjs-dist/standard_fonts/FoxitSerif.pfb');
-  standardFontDataUrlCache = new URL('./', standardFontFileUrl).href;
-  return { standardFontDataUrl: standardFontDataUrlCache };
-}
-
 function appendPageText(items: unknown[]): string {
   const lineMap = new Map<string, TextItem[]>();
   const yTolerance = 3;
@@ -95,11 +82,9 @@ export async function POST(request: NextRequest) {
 
     const arrayBuffer = await file.arrayBuffer();
     const pdfBytes = new Uint8Array(arrayBuffer);
-    const { standardFontDataUrl } = resolvePdfjsAssets();
     const pdf = await pdfjsLib.getDocument({
       data: pdfBytes,
       disableWorker: true,
-      standardFontDataUrl,
       verbosity: 0,
       useSystemFonts: true,
     } as Parameters<typeof pdfjsLib.getDocument>[0] & { disableWorker: boolean }).promise;
